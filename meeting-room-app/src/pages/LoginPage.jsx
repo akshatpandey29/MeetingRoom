@@ -101,8 +101,9 @@ function LoginPage() {
       {/* Left Panel */}
       <div className="hidden md:flex md:w-5/12 bg-slate-900 flex-col justify-between p-10">
         <div className="flex items-center gap-2">
-          <MdMeetingRoom size={28} className="text-blue-400" />
-          <span className="text-white text-xl font-semibold">RoomBook</span>
+          <img src="/plax logo.png" alt="Plaxonic logo" className='h-7 w-auto object-contain rounded-1xl' />
+          
+          <span className="text-white text-xl font-semibold" sr> Plaxonic Technologies</span>
         </div>
         <div>
           <h1 className="text-white text-3xl font-semibold leading-snug mb-4">
