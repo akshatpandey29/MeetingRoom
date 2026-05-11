@@ -43,7 +43,7 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
   ];
 
   return (
-    <aside className="w-full lg:w-64 bg-white border border-gray-200 rounded-2xl shadow-sm p-4 h-fit">
+    <aside className="hidden lg:block lg:w-64 bg-white border border-gray-200 rounded-2xl shadow-sm p-4 h-fit">
       <h2 className="text-lg font-semibold text-slate-900 mb-1">
         Admin Workspace
       </h2>

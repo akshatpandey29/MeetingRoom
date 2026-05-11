@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FaPlus,
   FaEdit,
@@ -45,6 +45,23 @@ function AdminDashboard() {
   const { normalUsers } = useAuth();
 
   const [activeSection, setActiveSection] = useState("dashboard");
+  useEffect(() => {
+  const handleMobileAdminSectionChange = (event) => {
+    setActiveSection(event.detail);
+  };
+
+  window.addEventListener(
+    "change-admin-section",
+    handleMobileAdminSectionChange
+  );
+
+  return () => {
+    window.removeEventListener(
+      "change-admin-section",
+      handleMobileAdminSectionChange
+    );
+  };
+}, []);
   const [bookingView, setBookingView] = useState("grid");
   const [formData, setFormData] = useState({
     name: "",
