@@ -101,7 +101,6 @@ function LoginPage() {
       {/* Left Panel */}
       <div className="hidden md:flex md:w-5/12 bg-slate-900 flex-col justify-between p-10">
         <div className="flex items-center gap-2">
-
           
           <span className="text-white text-xl font-semibold" sr> RoomBook</span>
         </div>
