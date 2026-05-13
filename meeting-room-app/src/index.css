@@ -147,6 +147,27 @@
   stroke: #94a3b8 !important;
 }
 
+
+/* Fix today date showing box + blue circle together */
+.react-datepicker__day--today {
+  font-weight: bold !important;
+  color: #1d4ed8 !important;
+  background-color: transparent !important;
+  border: 1.5px solid #1d4ed8 !important;
+  border-radius: 50% !important;
+}
+
+.react-datepicker__day--today.react-datepicker__day--selected {
+  background-color: #1d4ed8 !important;
+  color: white !important;
+  border: none !important;
+}
+
+.react-datepicker__day--selected {
+  background-color: #1d4ed8 !important;
+  color: white !important;
+  border-radius: 50% !important;
+}
 /* body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

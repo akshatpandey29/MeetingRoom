@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import {
@@ -6,6 +6,7 @@ import {
 } from 'react-icons/fa';
 import { useRooms } from '../context/RoomContext';
 import { useAuth } from '../context/AuthContext';
+import TimePickerWheel from './TimePickerWheel';
 
 function BookingModal({ isOpen, onClose, selectedDate, prefilledBooking, mode, roomId }) {
   const {
@@ -17,14 +18,35 @@ function BookingModal({ isOpen, onClose, selectedDate, prefilledBooking, mode, r
   } = useRooms();
   const { user } = useAuth();
 
-  const [selectedRoom, setSelectedRoom] = useState(
-    roomId || (prefilledBooking ? String(prefilledBooking.roomId) : '')
-  );
+ const [selectedRoom, setSelectedRoom] = useState('');
+
+// Add this useEffect to set room when prefilledBooking changes
+useEffect(() => {
+  if (roomId) {
+    setSelectedRoom(String(roomId));
+  } else if (prefilledBooking?.roomId) {
+    setSelectedRoom(String(prefilledBooking.roomId));
+  }
+}, [roomId, prefilledBooking]);
   const [startTime, setStartTime] = useState(null);
   const [endTime, setEndTime] = useState(null);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [loading, setLoading] = useState(false);
   const [adminRequestSent, setAdminRequestSent] = useState(false);
+
+useEffect(() => {
+  if (isOpen) {
+    setStartTime(null);
+    setEndTime(null);
+    setMessage({ text: '', type: '' });
+    setAdminRequestSent(false);
+    if (roomId) {
+      setSelectedRoom(String(roomId));
+    } else if (prefilledBooking?.roomId) {
+      setSelectedRoom(String(prefilledBooking.roomId));
+    }
+  }
+}, [isOpen, roomId, prefilledBooking]);
 
   if (!isOpen) return null;
 
@@ -39,23 +61,15 @@ function BookingModal({ isOpen, onClose, selectedDate, prefilledBooking, mode, r
     return `${year}-${month}-${day}`;
   };
 
-  const formatTime = (date) =>
-    date
-      ? date.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true,
-        })
-      : '';
+  const formatTime = (time) => {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const displayH = h % 12 || 12;
+  return `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+};
 
-  const formatTime24 = (date) =>
-    date
-      ? date.toLocaleTimeString([], {
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
-        })
-      : '';
+const formatTime24 = (time) => time || '';
 
   const dateStr = selectedDate
     ? selectedDate instanceof Date
@@ -95,6 +109,30 @@ function BookingModal({ isOpen, onClose, selectedDate, prefilledBooking, mode, r
       setMessage({ text: 'End time must be after start time.', type: 'error' });
       return;
     }
+
+    // Prevent past time booking for today
+const now = new Date();
+const todayStr = (() => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+})();
+
+if (dateStr === todayStr && startTime) {
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const startDateTime = new Date();
+  startDateTime.setHours(startHour, startMin, 0, 0);
+
+  if (startDateTime <= now) {
+    setMessage({
+      text: 'Cannot reschedule to a past time. Please select a future time.',
+      type: 'error',
+    });
+    return;
+  }
+}
     // const diffMins = (endTime - startTime) / 60000;
     // if (diffMins < 30) {
     //   setMessage({ text: 'Minimum booking is 30 minutes.', type: 'error' });
@@ -237,68 +275,56 @@ function BookingModal({ isOpen, onClose, selectedDate, prefilledBooking, mode, r
         )}
 
         {/* Time Pickers */}
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-              <FaClock size={11} className="text-blue-500" />
-              Start Time
-            </label>
-            <DatePicker
-              selected={startTime}
-              onChange={(time) => {
-                setStartTime(time);
-                setEndTime(null);
-                setMessage({ text: '', type: '' });
-                setAdminRequestSent(false);
-              }}
-              showTimeSelect
-              showTimeSelectOnly
-              timeIntervals={15}
-              timeCaption="Start"
-              dateFormat="h:mm aa"
-              placeholderText="Start time"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
-              <FaClock size={11} className="text-blue-500" />
-              End Time
-            </label>
-            <DatePicker
-              selected={endTime}
-              onChange={(time) => {
-                setEndTime(time);
-                setMessage({ text: '', type: '' });
-                setAdminRequestSent(false);
-              }}
-              showTimeSelect
-              showTimeSelectOnly
-              timeIntervals={15}
-              timeCaption="End"
-              dateFormat="h:mm aa"
-              placeholderText="End time"
-              disabled={!startTime}
-              minTime={startTime || new Date(new Date().setHours(0, 0, 0, 0))}
-              maxTime={new Date(new Date().setHours(23, 59, 0, 0))}
-              className={`w-full px-3 py-2.5 border rounded-xl text-sm outline-none
-                ${!startTime
-                  ? 'bg-gray-50 border-gray-100 text-gray-400'
-                  : 'border-gray-200 text-slate-800 focus:ring-2 focus:ring-blue-500'
-                }`}
-            />
-          </div>
-        </div>
+<div className="grid grid-cols-2 gap-3 mb-4">
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+      <FaClock size={11} className="text-blue-500" />
+      Start Time
+    </label>
+    <TimePickerWheel
+      value={startTime}
+      onChange={(time) => {
+        setStartTime(time);
+        setEndTime('');
+        setMessage({ text: '', type: '' });
+        setAdminRequestSent(false);
+      }}
+      disabled={false}
+      label="Select start time"
+    />
+  </div>
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-medium text-slate-700 flex items-center gap-1.5">
+      <FaClock size={11} className="text-blue-500" />
+      End Time
+    </label>
+    <TimePickerWheel
+      value={endTime}
+      onChange={(time) => {
+        setEndTime(time);
+        setMessage({ text: '', type: '' });
+        setAdminRequestSent(false);
+      }}
+      disabled={!startTime}
+      label="Select end time"
+    />
+  </div>
+</div>
 
         {/* Duration */}
         {startTime && endTime && (
-          <div className="mb-4 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between">
-            <span className="text-xs text-blue-600">Duration</span>
-            <span className="text-sm font-semibold text-blue-800">
-              {Math.round((endTime - startTime) / 60000)} minutes
-            </span>
-          </div>
-        )}
+  <div className="mb-4 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 flex items-center justify-between">
+    <span className="text-xs text-blue-600">Duration</span>
+    <span className="text-sm font-semibold text-blue-800">
+      {(() => {
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        const diff = (eh * 60 + em) - (sh * 60 + sm);
+        return diff > 0 ? `${diff} minutes` : 'Invalid time';
+      })()}
+    </span>
+  </div>
+)}
 
         {/* Admin Request Success */}
         {adminRequestSent && (

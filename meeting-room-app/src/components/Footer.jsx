@@ -66,25 +66,7 @@ function Footer() {
             © {new Date().getFullYear()} RoomBook. All rights reserved.
           </p>
 
-          <div className="flex items-center gap-3">
-            <a
-              href="https://github.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-400 hover:text-slate-700 transition-colors duration-150"
-            >
-              <FaGithub size={16} />
-            </a>
-
-            <a
-              href="https://linkedin.com"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-400 hover:text-blue-600 transition-colors duration-150"
-            >
-              <FaLinkedin size={16} />
-            </a>
-          </div>
+          
 
         </div>
       </div>
