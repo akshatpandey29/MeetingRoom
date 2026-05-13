@@ -12,7 +12,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import {
   FaUsers, FaMapMarkerAlt, FaCheckCircle,
   FaTimesCircle, FaArrowLeft, FaClock,
-  FaCalendarAlt, FaEdit, FaTrash, FaBell,
+  FaCalendarAlt, FaEdit, FaTrash, FaBell, FaLock,
 } from 'react-icons/fa';
 import { useRooms } from '../context/RoomContext';
 import { useAuth } from '../context/AuthContext';
@@ -55,6 +55,21 @@ function BookingPage() {
 
   const [showCancelModal, setShowCancelModal] = useState(false);
 const [cancelBookingId, setCancelBookingId] = useState(null);
+
+//const [adminRequestSent, setAdminRequestSent] = useState(false);
+
+// ─── Cancel restriction check ────────────────────────
+const isCancelDisabled = (booking) => {
+  const today = new Date().toISOString().split('T')[0];
+  if (booking.date !== today) return false;
+  const startTimeStr = booking.startTime;
+  if (!startTimeStr) return false;
+  const [hours, minutes] = startTimeStr.split(':').map(Number);
+  const slotStartTime = new Date();
+  slotStartTime.setHours(hours, minutes, 0, 0);
+  const cutoffTime = new Date(slotStartTime.getTime() - 60 * 60 * 1000);
+  return new Date() >= cutoffTime;
+};
 
   // ─── Room not found ──────────────────────────────────
   if (!selectedRoom) {
@@ -155,6 +170,28 @@ const formatTime24 = (time) => time || '';
       setMessage({ text: 'Please select an end time.', type: 'error' });
       return;
     }
+
+
+
+    // Check if selected date is today and time is in the past
+const now = new Date();
+const selectedDateStr = formatDate(selectedDate);
+const todayStr = formatDate(now);
+
+if (selectedDateStr === todayStr) {
+  const [startHour, startMin] = startTime.split(':').map(Number);
+  const startDateTime = new Date();
+  startDateTime.setHours(startHour, startMin, 0, 0);
+
+  if (startDateTime <= now) {
+    setMessage({
+      text: 'Cannot book a meeting in the past. Please select a future time.',
+      type: 'error'
+    });
+    return;
+  }
+}
+
     if (endTime <= startTime || !endTime || !startTime) {
   setMessage({ text: 'End time must be after start time.', type: 'error' });
   return;
@@ -234,23 +271,23 @@ const nEnd = new Date(`${dateStr} ${endTime}`);
     }
   };
 
-  // ─── Cancel booking ──────────────────────────────────
-  const handleCancelBooking = (bookingId) => {
-  setCancelBookingId(bookingId);
-  setShowCancelModal(true);
-};
+  // ───  booking ──────────────────────────────────
+//   const handleCancelBooking = (bookingId) => {
+//   setCancelBookingId(bookingId);
+//   setShowCancelModal(true);
+// };
 
-const handleConfirmCancelBooking = () => {
-  cancelBooking(cancelBookingId);
-  setShowCancelModal(false);
-  setCancelBookingId(null);
-  setMessage({ text: 'Booking cancelled.', type: 'success' });
-};
+// const handleConfirmCancelBooking = () => {
+//   cancelBooking(cancelBookingId);
+//   setShowCancelModal(false);
+//   setCancelBookingId(null);
+//   setMessage({ text: 'Booking cancelled.', type: 'success' });
+// };
 
-const handleCloseCancelModal = () => {
-  setShowCancelModal(false);
-  setCancelBookingId(null);
-};
+// const handleCloseCancelModal = () => {
+//   setShowCancelModal(false);
+//   setCancelBookingId(null);
+// };
 
   // ─── Calendar handlers ───────────────────────────────
   const handleCalendarDateClick = (info) => {
@@ -274,16 +311,49 @@ const handleCloseCancelModal = () => {
     setBookingModalOpen(true);
   };
 
-  const handleCancelFromPopup = () => {
-    if (!selectedEvent.extendedProps.isOwner) {
-      setMessage({ text: 'You can only cancel your own bookings.', type: 'error' });
-      setShowEventPopup(false);
-      return;
-    }
-    const booking = selectedEvent.extendedProps.booking;
+
+    const handleCancelFromPopup = () => {
+  if (!selectedEvent.extendedProps.isOwner) {
+    setMessage({ text: 'You can only cancel your own bookings.', type: 'error' });
     setShowEventPopup(false);
-    handleCancelBooking(booking.id);
-  };
+    return;
+  }
+  const booking = selectedEvent.extendedProps.booking;
+  // close popup first
+  setShowEventPopup(false);
+
+  // open confirm modal
+  setCancelBookingId(booking.id);
+  setShowCancelModal(true);
+};
+ 
+
+
+
+const handleCancelBooking = (bookingId) => {
+  const booking = bookedSlotsForDate.find((b) => b.id === bookingId);
+  if (booking && isCancelDisabled(booking)) {
+    setMessage({
+      text: 'Cannot cancel — less than 1 hour before slot.',
+      type: 'error'
+    });
+    return;
+  }
+  setCancelBookingId(bookingId);
+  setShowCancelModal(true);
+};
+  
+const handleConfirmCancelBooking = () => {
+  cancelBooking(cancelBookingId);
+  setShowCancelModal(false);
+  setCancelBookingId(null);
+  setMessage({ text: 'Booking cancelled successfully.', type: 'success' });
+};
+
+const handleCloseCancelModal = () => {
+  setShowCancelModal(false);
+  setCancelBookingId(null);
+};
 
   // ─── Calendar view dropdown ──────────────────────────
   const views = [
@@ -718,13 +788,22 @@ const handleCloseCancelModal = () => {
                           </p>
                         </div>
                         {booking.userEmail === user?.email && (
-                          <button
-                            onClick={() => handleCancelBooking(booking.id)}
-                            className="flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-800"
-                          >
-                            <FaTimesCircle size={11} /> Cancel
-                          </button>
-                        )}
+  <button
+    onClick={() => !isCancelDisabled(booking) && handleCancelBooking(booking.id)}
+    disabled={isCancelDisabled(booking)}
+    className={`flex items-center gap-1.5 text-xs font-medium transition-colors
+      ${isCancelDisabled(booking)
+        ? 'text-gray-400 cursor-not-allowed'
+        : 'text-red-600 hover:text-red-800 cursor-pointer'
+      }`}
+  >
+    {isCancelDisabled(booking)
+      ? <FaLock size={11} />
+      : <FaTimesCircle size={11} />
+    }
+    Cancel
+  </button>
+)}
                       </div>
                     ))}
                   </div>
