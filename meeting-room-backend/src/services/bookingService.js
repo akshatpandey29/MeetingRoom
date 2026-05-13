@@ -15,7 +15,14 @@ const hasTimeConflict = (existingStart, existingEnd, newStart, newEnd) => {
   return start < oldEnd && end > oldStart;
 };
 
-const createBooking = async ({ userId, roomId, date, startTime, endTime, purpose = "" }) => {
+const createBooking = async ({
+  userId,
+  roomId,
+  date,
+  startTime,
+  endTime,
+  purpose = "",
+}) => {
   if (!roomId || !date || !startTime || !endTime) {
     return {
       success: false,
@@ -107,7 +114,7 @@ const createBooking = async ({ userId, roomId, date, startTime, endTime, purpose
 const getAllBookings = async () => {
   const bookings = await Booking.find()
     .populate("userId", "name email role")
-    .populate("roomId", "name location capacity")
+    .populate("roomId", "name location capacity status isActive")
     .sort({ date: 1, startTime: 1 });
 
   return {
@@ -122,7 +129,7 @@ const getAllBookings = async () => {
 
 const getUserBookings = async (userId) => {
   const bookings = await Booking.find({ userId })
-    .populate("roomId", "name location capacity")
+    .populate("roomId", "name location capacity status isActive")
     .sort({ date: 1, startTime: 1 });
 
   return {
@@ -135,7 +142,12 @@ const getUserBookings = async (userId) => {
   };
 };
 
-const cancelBooking = async ({ bookingId, userId, isAdmin = false, reason = "" }) => {
+const cancelBooking = async ({
+  bookingId,
+  userId,
+  isAdmin = false,
+  reason = "",
+}) => {
   const booking = await Booking.findById(bookingId);
 
   if (!booking) {
@@ -153,6 +165,14 @@ const cancelBooking = async ({ bookingId, userId, isAdmin = false, reason = "" }
       success: false,
       statusCode: 403,
       message: "You can only cancel your own bookings.",
+    };
+  }
+
+  if (booking.status === BOOKING_STATUS.CANCELLED) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Booking is already cancelled.",
     };
   }
 
@@ -177,6 +197,22 @@ const rescheduleBooking = async ({
   newStartTime,
   newEndTime,
 }) => {
+  if (!newDate || !newStartTime || !newEndTime) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "New date, start time, and end time are required.",
+    };
+  }
+
+  if (convertTimeToMinutes(newEndTime) <= convertTimeToMinutes(newStartTime)) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "End time must be after start time.",
+    };
+  }
+
   const booking = await Booking.findById(bookingId);
 
   if (!booking) {
@@ -194,6 +230,32 @@ const rescheduleBooking = async ({
       success: false,
       statusCode: 403,
       message: "You can only reschedule your own bookings.",
+    };
+  }
+
+  if (booking.status !== BOOKING_STATUS.CONFIRMED) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Only confirmed bookings can be rescheduled.",
+    };
+  }
+
+  const room = await Room.findById(booking.roomId);
+
+  if (!room) {
+    return {
+      success: false,
+      statusCode: 404,
+      message: "Meeting room not found.",
+    };
+  }
+
+  if (!room.isActive || room.status !== ROOM_STATUS.AVAILABLE) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Please select an active meeting room.",
     };
   }
 
@@ -236,6 +298,14 @@ const rescheduleBooking = async ({
 };
 
 const getBookingsByRoomAndDate = async ({ roomId, date }) => {
+  if (!roomId || !date) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Room and date are required.",
+    };
+  }
+
   const bookings = await Booking.find({
     roomId,
     date,
@@ -252,6 +322,66 @@ const getBookingsByRoomAndDate = async ({ roomId, date }) => {
   };
 };
 
+const getAvailableSlots = async ({ roomId, date, slots = [] }) => {
+  if (!roomId || !date) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Room and date are required.",
+    };
+  }
+
+  const room = await Room.findById(roomId);
+
+  if (!room) {
+    return {
+      success: false,
+      statusCode: 404,
+      message: "Meeting room not found.",
+    };
+  }
+
+  if (!room.isActive || room.status !== ROOM_STATUS.AVAILABLE) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Please select an active meeting room.",
+    };
+  }
+
+  const bookings = await Booking.find({
+    roomId,
+    date,
+    status: BOOKING_STATUS.CONFIRMED,
+  });
+
+  const bookedSlots = bookings.map((booking) => booking.slot);
+
+  const availableSlots = slots.filter((slot) => {
+    const [slotStart, slotEnd] = slot.split(" - ");
+
+    const hasConflict = bookings.some((booking) =>
+      hasTimeConflict(
+        booking.startTime,
+        booking.endTime,
+        slotStart,
+        slotEnd
+      )
+    );
+
+    return !hasConflict;
+  });
+
+  return {
+    success: true,
+    message: "Available slots fetched successfully.",
+    data: {
+      availableSlots,
+      bookedSlots,
+    },
+  };
+};
+
 module.exports = {
   createBooking,
   getAllBookings,
@@ -259,4 +389,6 @@ module.exports = {
   cancelBooking,
   rescheduleBooking,
   getBookingsByRoomAndDate,
+  getAvailableSlots,
+  hasTimeConflict,
 };

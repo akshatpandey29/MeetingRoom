@@ -4,18 +4,36 @@ const {
   ROLES,
   BOOKING_STATUS,
   ADMIN_REQUEST_STATUS,
+  ROOM_STATUS,
 } = require("../utils/constants");
+
+const convertTimeToMinutes = (time) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+const hasTimeConflict = (existingStart, existingEnd, newStart, newEnd) => {
+  const oldStart = convertTimeToMinutes(existingStart);
+  const oldEnd = convertTimeToMinutes(existingEnd);
+  const start = convertTimeToMinutes(newStart);
+  const end = convertTimeToMinutes(newEnd);
+
+  return start < oldEnd && end > oldStart;
+};
 
 /**
  * GET /api/admin/stats
- * Admin dashboard stats
  */
 const getDashboardStats = async (req, res, next) => {
   try {
     const totalUsers = await User.countDocuments({ role: ROLES.USER });
     const totalAdmins = await User.countDocuments({ role: ROLES.ADMIN });
     const totalRooms = await Room.countDocuments();
+    const activeRooms = await Room.countDocuments({ isActive: true });
     const totalBookings = await Booking.countDocuments();
+    const confirmedBookings = await Booking.countDocuments({
+      status: BOOKING_STATUS.CONFIRMED,
+    });
     const pendingRequests = await AdminRequest.countDocuments({
       status: ADMIN_REQUEST_STATUS.PENDING,
     });
@@ -26,7 +44,9 @@ const getDashboardStats = async (req, res, next) => {
         totalUsers,
         totalAdmins,
         totalRooms,
+        activeRooms,
         totalBookings,
+        confirmedBookings,
         pendingRequests,
       },
       "Dashboard stats fetched successfully."
@@ -38,7 +58,6 @@ const getDashboardStats = async (req, res, next) => {
 
 /**
  * GET /api/admin/users
- * Get all users
  */
 const getAllUsers = async (req, res, next) => {
   try {
@@ -61,7 +80,6 @@ const getAllUsers = async (req, res, next) => {
 
 /**
  * PATCH /api/admin/users/:id/role
- * Change user role admin <-> user
  */
 const changeUserRole = async (req, res, next) => {
   try {
@@ -78,6 +96,7 @@ const changeUserRole = async (req, res, next) => {
     }
 
     user.role = user.role === ROLES.ADMIN ? ROLES.USER : ROLES.ADMIN;
+
     await user.save();
 
     return ApiResponse.success(
@@ -92,7 +111,6 @@ const changeUserRole = async (req, res, next) => {
 
 /**
  * PATCH /api/admin/users/:id/status
- * Enable or disable user account
  */
 const toggleUserStatus = async (req, res, next) => {
   try {
@@ -109,6 +127,7 @@ const toggleUserStatus = async (req, res, next) => {
     }
 
     user.isActive = !user.isActive;
+
     await user.save();
 
     return ApiResponse.success(
@@ -125,7 +144,6 @@ const toggleUserStatus = async (req, res, next) => {
 
 /**
  * GET /api/admin/booking-requests
- * Get all admin booking requests
  */
 const getBookingRequests = async (req, res, next) => {
   try {
@@ -149,7 +167,6 @@ const getBookingRequests = async (req, res, next) => {
 
 /**
  * PATCH /api/admin/booking-requests/:id/approve
- * Approve booking request and create booking
  */
 const approveBookingRequest = async (req, res, next) => {
   try {
@@ -168,22 +185,36 @@ const approveBookingRequest = async (req, res, next) => {
 
     const room = await Room.findById(request.roomId);
 
-    if (!room || !room.isActive) {
-      return ApiResponse.badRequest(res, "Room is not active or not found.");
+    if (!room) {
+      return ApiResponse.notFound(res, "Room not found.");
     }
 
-    const existingBooking = await Booking.findOne({
+    if (!room.isActive || room.status !== ROOM_STATUS.AVAILABLE) {
+      return ApiResponse.badRequest(
+        res,
+        "Room is not active or not available."
+      );
+    }
+
+    const existingBookings = await Booking.find({
       roomId: request.roomId,
       date: request.date,
-      startTime: request.startTime,
-      endTime: request.endTime,
       status: BOOKING_STATUS.CONFIRMED,
     });
 
-    if (existingBooking) {
+    const conflict = existingBookings.find((booking) =>
+      hasTimeConflict(
+        booking.startTime,
+        booking.endTime,
+        request.startTime,
+        request.endTime
+      )
+    );
+
+    if (conflict) {
       return ApiResponse.conflict(
         res,
-        "This time slot is already booked."
+        "This time conflicts with an existing booking."
       );
     }
 
@@ -202,6 +233,7 @@ const approveBookingRequest = async (req, res, next) => {
     request.status = ADMIN_REQUEST_STATUS.APPROVED;
     request.reviewedAt = new Date();
     request.adminNote = req.body.adminNote || null;
+
     await request.save();
 
     return ApiResponse.success(
@@ -219,7 +251,6 @@ const approveBookingRequest = async (req, res, next) => {
 
 /**
  * PATCH /api/admin/booking-requests/:id/reject
- * Reject booking request
  */
 const rejectBookingRequest = async (req, res, next) => {
   try {
@@ -239,6 +270,7 @@ const rejectBookingRequest = async (req, res, next) => {
     request.status = ADMIN_REQUEST_STATUS.REJECTED;
     request.reviewedAt = new Date();
     request.adminNote = req.body.adminNote || null;
+
     await request.save();
 
     return ApiResponse.success(
