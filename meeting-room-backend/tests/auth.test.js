@@ -18,5 +18,6 @@ describe("Auth APIs", () => {
       });
 
     expect([200, 400, 401, 404]).toContain(response.statusCode);
+    
   });
 });
