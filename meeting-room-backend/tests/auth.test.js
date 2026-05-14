@@ -3,7 +3,7 @@ const app = require("../src/app");
 
 describe("Auth APIs", () => {
   test("GET / should confirm backend is running", async () => {
-    const response = await request(app).get("/");
+    const response = await request(app).get("/health");
 
     expect(response.statusCode).toBe(200);
     expect(response.body.success).toBe(true);
