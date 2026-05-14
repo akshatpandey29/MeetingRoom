@@ -3,6 +3,7 @@ const env = require("../config/env");
 const { User } = require("../models");
 const logger = require("../utils/logger");
 const { ROLES } = require("../utils/constants");
+const emailService = require("./emailService");
 
 const generateTokens = (userId) => {
   const accessToken = jwt.sign(
@@ -32,6 +33,10 @@ const registerUser = async ({ name, email, password }) => {
     email,
     password,
     role: ROLES.USER,
+  });
+    await emailService.sendWelcomeEmail({
+    to: user.email,
+    name: user.name,
   });
 
   logger.info(`New user registered: ${email}`);

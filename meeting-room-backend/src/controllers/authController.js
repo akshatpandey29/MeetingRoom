@@ -8,14 +8,14 @@ const registerValidation = [
     .trim()
     .notEmpty().withMessage('Name is required')
     .isLength({ min: 2, max: 100 }).withMessage('Name must be 2-100 characters'),
+
   body('email')
     .isEmail().withMessage('Valid email is required')
     .normalizeEmail(),
+
   body('password')
     .isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
-  body('role')
-    .optional()
-    .isIn(['user', 'admin']).withMessage('Role must be user or admin'),
+
   validateRequest,
 ];
 

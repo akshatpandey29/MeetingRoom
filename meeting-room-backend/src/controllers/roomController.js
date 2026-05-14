@@ -137,18 +137,21 @@ const updateRoom = async (req, res, next) => {
 
 const deleteRoom = async (req, res, next) => {
   try {
-    const room = await Room.findByIdAndDelete(req.params.id);
+    const room = await Room.findById(req.params.id);
 
     if (!room) {
       return ApiResponse.notFound(res, "Room not found");
     }
 
-    logger.info(`Room deleted: ${req.params.id}`);
+    room.isActive = false;
+    await room.save();
+
+    logger.info(`Room deactivated instead of deleted: ${req.params.id}`);
 
     return ApiResponse.success(
       res,
-      null,
-      "Room deleted successfully"
+      { room },
+      "Room deactivated successfully"
     );
   } catch (error) {
     next(error);

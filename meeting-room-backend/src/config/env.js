@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const requiredEnvVars = [
   'JWT_SECRET',
+  'JWT_REFRESH_SECRET',
   'MONGO_URI',
 ];
 
