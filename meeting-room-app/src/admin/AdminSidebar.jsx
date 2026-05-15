@@ -15,16 +15,6 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
       icon: <FaTachometerAlt size={14} />,
     },
     {
-      id: "users",
-      label: "Users",
-      icon: <FaUsers size={14} />,
-    },
-    {
-      id: "rooms",
-      label: "Rooms",
-      icon: <FaDoorOpen size={14} />,
-    },
-    {
       id: "bookings",
       label: "Booking Management",
       icon: <FaCalendarCheck size={14} />,
@@ -34,6 +24,16 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
       label: "Booking Requests",
       icon: <FaBell size={14} />,
       badge: pendingCount,
+    },
+    {
+      id: "users",
+      label: "Users",
+      icon: <FaUsers size={14} />,
+    },
+    {
+      id: "rooms",
+      label: "Rooms",
+      icon: <FaDoorOpen size={14} />,
     },
     {
       id: "exports",
