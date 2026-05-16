@@ -8,6 +8,9 @@ import {
   FaDownload,
   FaTimesCircle,
   FaCheckCircle,
+  FaFileExport,
+  FaTable,
+  FaUsers,
 } from "react-icons/fa";
 
 function AdminExports({ bookings }) {
@@ -28,8 +31,8 @@ function AdminExports({ bookings }) {
   ];
 
   const selectedDurationLabel =
-    durationOptions.find((option) => option.value === selectedDuration)?.label ||
-    "All Bookings";
+    durationOptions.find((option) => option.value === selectedDuration)
+      ?.label || "All Bookings";
 
   const formatDisplayDate = (dateValue) => {
     if (!dateValue) return "Not available";
@@ -96,6 +99,12 @@ function AdminExports({ bookings }) {
 
   const filteredBookings = bookings.filter(isBookingInsideSelectedDuration);
 
+  const uniqueUsers = new Set(
+    filteredBookings
+      .map((booking) => booking.userEmail)
+      .filter((email) => Boolean(email))
+  );
+
   const exportData = filteredBookings.map((booking, index) => ({
     serialNo: index + 1,
     roomName: booking.roomName || "Not available",
@@ -121,108 +130,26 @@ function AdminExports({ bookings }) {
 
   const checkDataAvailable = () => {
     if (exportData.length === 0) {
-      showMessage(
-        "No booking records available for the selected duration.",
-        "error"
-      );
+      showMessage("No booking records available for selected duration.", "error");
       return false;
     }
 
     return true;
   };
 
-  const downloadFile = (content, fileName, fileType) => {
-    const blob = new Blob([content], { type: fileType });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-
-    URL.revokeObjectURL(url);
-  };
-
-  const exportAsCSV = () => {
-    if (!checkDataAvailable()) return;
-
-    const headers = [
-      "S.No",
-      "Room Name",
-      "Date",
-      "Slot",
-      "Booked By",
-      "User Email",
-    ];
-
-    const rows = exportData.map((booking) => [
-      booking.serialNo,
-      booking.roomName,
-      booking.date,
-      booking.slot,
-      booking.bookedBy,
-      booking.userEmail,
-    ]);
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) =>
-        row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
-      ),
-    ].join("\n");
-
-    downloadFile(
-      csvContent,
-      `booking-report-${selectedDuration}.csv`,
-      "text/csv;charset=utf-8;"
-    );
-
-    showMessage("CSV report downloaded successfully.", "success");
-  };
-
   const exportAsExcel = () => {
     if (!checkDataAvailable()) return;
 
-    const excelRows = exportData.map((booking) => ({
-      "S.No": booking.serialNo,
-      "Room Name": booking.roomName,
-      Date: booking.date,
-      Slot: booking.slot,
-      "Booked By": booking.bookedBy,
-      "User Email": booking.userEmail,
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
 
     worksheet["!cols"] = [
       { wch: 8 },
-      { wch: 30 },
+      { wch: 24 },
+      { wch: 16 },
       { wch: 18 },
-      { wch: 24 },
-      { wch: 24 },
-      { wch: 35 },
+      { wch: 20 },
+      { wch: 28 },
     ];
-
-    const range = XLSX.utils.decode_range(worksheet["!ref"]);
-
-    for (let row = range.s.r; row <= range.e.r; row++) {
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: row, c: col });
-
-        if (!worksheet[cellAddress]) continue;
-
-        worksheet[cellAddress].s = {
-          alignment: {
-            vertical: "center",
-            horizontal: row === 0 ? "center" : "left",
-            wrapText: true,
-          },
-          font: {
-            bold: row === 0,
-          },
-        };
-      }
-    }
 
     const workbook = XLSX.utils.book_new();
 
@@ -231,6 +158,28 @@ function AdminExports({ bookings }) {
     XLSX.writeFile(workbook, `booking-report-${selectedDuration}.xlsx`);
 
     showMessage("Excel report downloaded successfully.", "success");
+  };
+
+  const exportAsCSV = () => {
+    if (!checkDataAvailable()) return;
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
+
+    const blob = new Blob([csvOutput], {
+      type: "text/csv;charset=utf-8;",
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `booking-report-${selectedDuration}.csv`;
+    link.click();
+
+    URL.revokeObjectURL(url);
+
+    showMessage("CSV report downloaded successfully.", "success");
   };
 
   const exportAsPDF = () => {
@@ -338,30 +287,6 @@ function AdminExports({ bookings }) {
               background: #f8fafc;
             }
 
-            .col-small {
-              width: 8%;
-            }
-
-            .col-room {
-              width: 22%;
-            }
-
-            .col-date {
-              width: 15%;
-            }
-
-            .col-slot {
-              width: 17%;
-            }
-
-            .col-user {
-              width: 18%;
-            }
-
-            .col-email {
-              width: 20%;
-            }
-
             @media print {
               body {
                 padding: 18px;
@@ -381,9 +306,9 @@ function AdminExports({ bookings }) {
 
         <body>
           <div class="report-header">
-            <div class="small-title">RoomBook Admin Export</div>
+            <div class="small-title">RoomBook Admin Report</div>
             <h1>Booking Report</h1>
-            <div class="subtitle">Generated from Admin Workspace</div>
+            <div class="subtitle">Generated from Reports section</div>
           </div>
 
           <div class="summary-box">
@@ -394,12 +319,12 @@ function AdminExports({ bookings }) {
           <table>
             <thead>
               <tr>
-                <th class="col-small">S.No</th>
-                <th class="col-room">Room Name</th>
-                <th class="col-date">Date</th>
-                <th class="col-slot">Slot</th>
-                <th class="col-user">Booked By</th>
-                <th class="col-email">User Email</th>
+                <th>S.No</th>
+                <th>Room Name</th>
+                <th>Date</th>
+                <th>Slot</th>
+                <th>Booked By</th>
+                <th>User Email</th>
               </tr>
             </thead>
             <tbody>
@@ -423,117 +348,177 @@ function AdminExports({ bookings }) {
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-gray-100">
-        <p className="text-sm font-medium text-blue-600 mb-2">
-          Admin Exports
-        </p>
+    <div className="space-y-4">
+      {message.text && (
+        <div
+          className={`px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${
+            message.type === "success"
+              ? "bg-green-50 border-green-100 text-green-700"
+              : "bg-red-50 border-red-100 text-red-600"
+          }`}
+        >
+          {message.type === "success" ? (
+            <FaCheckCircle size={14} />
+          ) : (
+            <FaTimesCircle size={14} />
+          )}
+          <span>{message.text}</span>
+        </div>
+      )}
 
-        <h2 className="text-xl font-semibold text-slate-900">
-          Download Booking Reports
-        </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <ReportInfoCard
+          icon={<FaTable />}
+          title="Booking Records"
+          value={filteredBookings.length}
+          helper="Records available for selected duration"
+          color="blue"
+        />
 
-        <p className="text-sm text-slate-500 mt-1">
-          Export booking records by selected duration.
-        </p>
+        <ReportInfoCard
+          icon={<FaCalendarAlt />}
+          title="Duration"
+          value={selectedDurationLabel}
+          helper="Current report filter"
+          color="purple"
+        />
+
+        <ReportInfoCard
+          icon={<FaUsers />}
+          title="Unique Users"
+          value={uniqueUsers.size}
+          helper="Employees in filtered report"
+          color="green"
+        />
       </div>
 
-      <div className="p-6">
-        {message.text && (
-          <div
-            className={`mb-5 px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${
-              message.type === "success"
-                ? "bg-green-50 border-green-100 text-green-700"
-                : "bg-red-50 border-red-100 text-red-600"
-            }`}
-          >
-            {message.type === "success" ? (
-              <FaCheckCircle size={14} />
-            ) : (
-              <FaTimesCircle size={14} />
-            )}
-            <span>{message.text}</span>
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <FaFileExport size={14} />
+            </div>
+
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">
+                Reports & Exports
+              </h2>
+
+              <p className="text-xs text-slate-500 mt-0.5">
+                Download booking data in Excel, PDF, or CSV format.
+              </p>
+            </div>
           </div>
-        )}
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-end">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">
-              Select Duration
-            </label>
+        <div className="p-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                Select Duration
+              </label>
 
-            <div className="relative">
-              <FaCalendarAlt
-                size={13}
-                className="absolute left-3.5 top-3.5 text-slate-400"
-              />
+              <div className="relative">
+                <FaCalendarAlt
+                  size={13}
+                  className="absolute left-3.5 top-3 text-slate-400"
+                />
 
-              <select
-                value={selectedDuration}
-                onChange={(event) => {
-                  setSelectedDuration(event.target.value);
-                  setMessage({
-                    text: "",
-                    type: "",
-                  });
-                }}
-                className="w-full appearance-none pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                {durationOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <select
+                  value={selectedDuration}
+                  onChange={(event) => {
+                    setSelectedDuration(event.target.value);
+                    setMessage({
+                      text: "",
+                      type: "",
+                    });
+                  }}
+                  className="w-full appearance-none pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  {durationOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
 
-              <FaChevronDown
-                size={12}
-                className="absolute right-4 top-4 text-slate-400 pointer-events-none"
-              />
+                <FaChevronDown
+                  size={12}
+                  className="absolute right-4 top-3.5 text-slate-400 pointer-events-none"
+                />
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
+              <p className="text-sm font-semibold text-blue-800">
+                {filteredBookings.length} records ready
+              </p>
+
+              <p className="text-xs text-blue-700 mt-1">
+                Report duration: {selectedDurationLabel}
+              </p>
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-            <p className="text-sm font-medium text-blue-800">
-              Ready to export
-            </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={exportAsExcel}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
+            >
+              <FaFileExcel size={13} />
+              Export Excel
+            </button>
 
-            <p className="text-sm text-blue-700 mt-1">
-              {filteredBookings.length} booking record
-              {filteredBookings.length !== 1 ? "s" : ""} for{" "}
-              {selectedDurationLabel.toLowerCase()}.
-            </p>
+            <button
+              type="button"
+              onClick={exportAsPDF}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              <FaFilePdf size={13} />
+              Export PDF
+            </button>
+
+            <button
+              type="button"
+              onClick={exportAsCSV}
+              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <FaDownload size={13} />
+              Export CSV
+            </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={exportAsExcel}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-green-50 text-green-600 rounded-xl hover:bg-green-100 transition-colors"
-          >
-            <FaFileExcel size={13} />
-            Export Excel
-          </button>
+function ReportInfoCard({ icon, title, value, helper, color }) {
+  const styles = {
+    blue: "bg-blue-50 text-blue-600",
+    green: "bg-green-50 text-green-600",
+    purple: "bg-purple-50 text-purple-600",
+  };
 
-          <button
-            type="button"
-            onClick={exportAsPDF}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors"
-          >
-            <FaFilePdf size={13} />
-            Export PDF
-          </button>
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex items-center gap-3">
+      <div
+        className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+          styles[color] || styles.blue
+        }`}
+      >
+        {icon}
+      </div>
 
-          <button
-            type="button"
-            onClick={exportAsCSV}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors"
-          >
-            <FaDownload size={13} />
-            Export CSV
-          </button>
-        </div>
+      <div>
+        <p className="text-xs text-slate-500">{title}</p>
+
+        <h3 className="text-lg font-bold text-slate-900 leading-tight">
+          {value}
+        </h3>
+
+        <p className="text-[11px] text-slate-400 mt-0.5">{helper}</p>
       </div>
     </div>
   );

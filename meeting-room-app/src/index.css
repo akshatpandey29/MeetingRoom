@@ -2,108 +2,416 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================
+   Global Base
+========================= */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
+    Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* =========================
+   React DatePicker
+   Professional compact style
+========================= */
+.react-datepicker-wrapper {
+  width: 100%;
+}
+
+.react-datepicker__input-container {
+  width: 100%;
+}
+
+.react-datepicker-popper {
+  z-index: 80 !important;
+}
+
 .react-datepicker {
   font-family: inherit !important;
   border: 1px solid #e2e8f0 !important;
-  border-radius: 16px !important;
+  border-radius: 18px !important;
   overflow: hidden !important;
+  background: #ffffff !important;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14) !important;
 }
+
+.react-datepicker__triangle {
+  display: none !important;
+}
+
 .react-datepicker__header {
   background-color: #f8fafc !important;
   border-bottom: 1px solid #e2e8f0 !important;
-  padding-top: 12px !important;
+  padding: 12px 0 8px !important;
 }
+
 .react-datepicker__current-month {
-  font-size: 14px !important;
-  font-weight: 600 !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
   color: #0f172a !important;
+  margin-bottom: 8px !important;
 }
+
+.react-datepicker__navigation {
+  top: 13px !important;
+}
+
+.react-datepicker__navigation-icon::before {
+  border-color: #94a3b8 !important;
+  border-width: 2px 2px 0 0 !important;
+  height: 8px !important;
+  width: 8px !important;
+}
+
+.react-datepicker__month {
+  margin: 10px 12px 14px !important;
+}
+
+.react-datepicker__day-names {
+  margin-bottom: 4px !important;
+}
+
 .react-datepicker__day-name {
+  width: 2.1rem !important;
+  line-height: 2rem !important;
   color: #94a3b8 !important;
-  font-size: 12px !important;
-}
-.react-datepicker__day {
-  border-radius: 8px !important;
   font-size: 13px !important;
-  color: #334155 !important;
+  font-weight: 600 !important;
 }
+
+.react-datepicker__week {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.react-datepicker__day {
+  width: 2.1rem !important;
+  height: 2.1rem !important;
+  line-height: 2.1rem !important;
+  margin: 0.12rem !important;
+  border-radius: 9999px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #334155 !important;
+  transition: all 0.18s ease !important;
+}
+
 .react-datepicker__day:hover {
   background-color: #eff6ff !important;
-  color: #1d4ed8 !important;
-}
-.react-datepicker__day--selected {
-  background-color: #2563eb !important;
-  color: white !important;
-}
-.react-datepicker__day--today {
-  font-weight: 700 !important;
   color: #2563eb !important;
 }
-.react-datepicker__day--disabled {
+
+.react-datepicker__day--keyboard-selected {
+  background-color: #eff6ff !important;
+  color: #2563eb !important;
+}
+
+.react-datepicker__day--selected {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+.react-datepicker__day--today {
+  color: #2563eb !important;
+  font-weight: 700 !important;
+  background-color: transparent !important;
+  border: 1.5px solid #2563eb !important;
+}
+
+.react-datepicker__day--today.react-datepicker__day--selected {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
+.react-datepicker__day--outside-month {
   color: #cbd5e1 !important;
 }
 
-/* FullCalendar custom styles */
+.react-datepicker__day--disabled {
+  color: #cbd5e1 !important;
+  cursor: not-allowed !important;
+}
+
+.react-datepicker__day--disabled:hover {
+  background-color: transparent !important;
+  color: #cbd5e1 !important;
+}
+
+/* =========================
+   FullCalendar custom styles
+========================= */
 .fc {
   font-family: inherit !important;
 }
+
 .fc .fc-button {
   background-color: #0f172a !important;
   border-color: #0f172a !important;
   font-size: 13px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
   padding: 6px 12px !important;
   text-transform: capitalize !important;
 }
+
 .fc .fc-button:hover {
   background-color: #1e293b !important;
   border-color: #1e293b !important;
 }
+
 .fc .fc-button-active {
   background-color: #2563eb !important;
   border-color: #2563eb !important;
 }
+
 .fc .fc-toolbar-title {
   font-size: 18px !important;
-  font-weight: 600 !important;
+  font-weight: 700 !important;
   color: #0f172a !important;
 }
+
 .fc .fc-col-header-cell-cushion {
   font-size: 13px !important;
-  font-weight: 500 !important;
+  font-weight: 600 !important;
   color: #64748b !important;
   text-decoration: none !important;
 }
+
 .fc .fc-daygrid-day-number {
   font-size: 13px !important;
   color: #334155 !important;
   text-decoration: none !important;
 }
+
 .fc .fc-daygrid-day.fc-day-today {
   background-color: #eff6ff !important;
 }
+
 .fc .fc-event {
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   font-size: 12px !important;
   padding: 2px 6px !important;
   cursor: pointer !important;
 }
+
 .fc .fc-daygrid-day:hover {
   background-color: #f8fafc !important;
   cursor: pointer !important;
 }
+
 .fc-theme-standard td,
 .fc-theme-standard th {
   border-color: #e2e8f0 !important;
 }
+
 .fc-theme-standard .fc-scrollgrid {
   border-color: #e2e8f0 !important;
 }
 
-/* Mobile responsive fixes */
+/* =========================
+   Time Picker Styling
+========================= */
+.react-time-picker {
+  width: 100% !important;
+}
+
+.react-time-picker__wrapper {
+  min-height: 40px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  padding: 6px 10px !important;
+  background: #ffffff !important;
+}
+
+.react-time-picker__inputGroup {
+  font-size: 14px !important;
+  color: #1e293b !important;
+}
+
+.react-time-picker__clock {
+  border-radius: 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14) !important;
+  z-index: 90 !important;
+}
+
+.react-time-picker__button svg {
+  stroke: #94a3b8 !important;
+}
+
+/* =========================
+   Admin Reusable Components
+   Use these class names in AdminDashboard.jsx
+========================= */
+@layer components {
+  .admin-page {
+    @apply min-h-screen bg-slate-50 px-4 py-5 md:px-6 md:py-6;
+  }
+
+  .admin-container {
+    @apply mx-auto max-w-7xl;
+  }
+
+  .admin-section-card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .admin-section-header {
+    @apply border-b border-slate-100 px-5 py-4;
+  }
+
+  .admin-section-title {
+    @apply text-lg font-bold text-slate-900;
+  }
+
+  .admin-section-subtitle {
+    @apply mt-1 text-sm text-slate-500;
+  }
+
+  .admin-card-body {
+    @apply p-5;
+  }
+
+  .admin-label {
+    @apply mb-2 block text-sm font-semibold text-slate-700;
+  }
+
+  .admin-input {
+    @apply h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100;
+  }
+
+  .admin-select {
+    @apply h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100;
+  }
+
+  .admin-textarea {
+    @apply min-h-24 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100;
+  }
+
+  .admin-primary-btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 active:scale-[0.99];
+  }
+
+  .admin-secondary-btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-[0.99];
+  }
+
+  .admin-danger-btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-red-50 px-4 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.99];
+  }
+
+  .admin-action-blue {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-blue-50 px-3 text-sm font-semibold text-blue-600 transition hover:bg-blue-100 active:scale-[0.98];
+  }
+
+  .admin-action-green {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-green-50 px-3 text-sm font-semibold text-green-700 transition hover:bg-green-100 active:scale-[0.98];
+  }
+
+  .admin-action-red {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-red-50 px-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.98];
+  }
+
+  .admin-action-amber {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-orange-50 px-3 text-sm font-semibold text-orange-600 transition hover:bg-orange-100 active:scale-[0.98];
+  }
+
+  .admin-action-slate {
+    @apply inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-slate-100 px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 active:scale-[0.98];
+  }
+
+  .admin-badge-green {
+    @apply inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700;
+  }
+
+  .admin-badge-blue {
+    @apply inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-700;
+  }
+
+  .admin-badge-purple {
+    @apply inline-flex items-center rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-700;
+  }
+
+  .admin-badge-red {
+    @apply inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700;
+  }
+
+  .admin-badge-slate {
+    @apply inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600;
+  }
+
+  .admin-summary-card {
+    @apply rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  .admin-table-head {
+    @apply bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500;
+  }
+
+  .admin-table-cell {
+    @apply border-t border-slate-100 px-4 py-3 text-sm text-slate-700;
+  }
+}
+
+/* =========================
+   View Transition Helpers
+========================= */
+.view-fade-enter {
+  animation: viewFadeIn 0.18s ease-out;
+}
+
+@keyframes viewFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+   Mobile Responsive Fixes
+========================= */
 @media (max-width: 640px) {
   .react-datepicker {
+    max-width: 92vw !important;
+  }
+
+  .react-datepicker__day,
+  .react-datepicker__day-name {
+    width: 1.95rem !important;
+    height: 1.95rem !important;
+    line-height: 1.95rem !important;
     font-size: 12px !important;
   }
 
@@ -121,64 +429,3 @@
     padding: 4px 8px !important;
   }
 }
-
-
-/* TimePicker styling */
-.react-time-picker {
-  width: 100% !important;
-}
-.react-time-picker__wrapper {
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 12px !important;
-  padding: 8px 12px !important;
-  background: white !important;
-}
-.react-time-picker__inputGroup {
-  font-size: 14px !important;
-  color: #1e293b !important;
-}
-.react-time-picker__clock {
-  border-radius: 16px !important;
-  border: 1px solid #e2e8f0 !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
-  z-index: 100 !important;
-}
-.react-time-picker__button svg {
-  stroke: #94a3b8 !important;
-}
-
-
-/* Fix today date showing box + blue circle together */
-.react-datepicker__day--today {
-  font-weight: bold !important;
-  color: #1d4ed8 !important;
-  background-color: transparent !important;
-  border: 1.5px solid #1d4ed8 !important;
-  border-radius: 50% !important;
-}
-
-.react-datepicker__day--today.react-datepicker__day--selected {
-  background-color: #1d4ed8 !important;
-  color: white !important;
-  border: none !important;
-}
-
-.react-datepicker__day--selected {
-  background-color: #1d4ed8 !important;
-  color: white !important;
-  border-radius: 50% !important;
-}
-
-/* body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
-} */

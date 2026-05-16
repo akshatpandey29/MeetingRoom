@@ -5,15 +5,18 @@ import {
   FaDoorOpen,
   FaCalendarAlt,
   FaTimes,
+  FaBell,
 } from "react-icons/fa";
 import { useRooms } from "../context/RoomContext";
 import { useAuth } from "../context/AuthContext";
 
 function AdminGlobalSearch({ setActiveSection, setBookingView }) {
-  const { rooms, bookings } = useRooms();
+  const { rooms, bookings, adminRequests } = useRooms();
   const { users } = useAuth();
 
   const [searchText, setSearchText] = useState("");
+
+  const safeLower = (value) => String(value || "").toLowerCase();
 
   const searchResults = useMemo(() => {
     const value = searchText.trim().toLowerCase();
@@ -23,17 +26,19 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
     const userResults = users
       .filter((currentUser) => {
         return (
-          currentUser.name.toLowerCase().includes(value) ||
-          currentUser.email.toLowerCase().includes(value) ||
-          currentUser.role.toLowerCase().includes(value) ||
-          currentUser.status.toLowerCase().includes(value)
+          safeLower(currentUser.name).includes(value) ||
+          safeLower(currentUser.email).includes(value) ||
+          safeLower(currentUser.role).includes(value) ||
+          safeLower(currentUser.status).includes(value)
         );
       })
       .map((currentUser) => ({
         id: `user-${currentUser.id}`,
         type: "User",
         title: currentUser.name,
-        subtitle: `${currentUser.email} • ${currentUser.role} • ${currentUser.status}`,
+        subtitle: `${currentUser.email} • ${currentUser.role} • ${
+          currentUser.status || "active"
+        }`,
         section: "users",
         icon: <FaUsers size={13} />,
       }));
@@ -41,10 +46,10 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
     const roomResults = rooms
       .filter((room) => {
         return (
-          room.name.toLowerCase().includes(value) ||
-          room.location.toLowerCase().includes(value) ||
-          room.status.toLowerCase().includes(value) ||
-          String(room.capacity).includes(value) ||
+          safeLower(room.name).includes(value) ||
+          safeLower(room.location).includes(value) ||
+          safeLower(room.status).includes(value) ||
+          String(room.capacity || "").includes(value) ||
           (room.isActive ? "active" : "inactive").includes(value)
         );
       })
@@ -62,11 +67,11 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
     const bookingResults = bookings
       .filter((booking) => {
         return (
-          booking.roomName.toLowerCase().includes(value) ||
-          booking.date.toLowerCase().includes(value) ||
-          booking.slot.toLowerCase().includes(value) ||
-          (booking.bookedBy || "").toLowerCase().includes(value) ||
-          (booking.userEmail || "").toLowerCase().includes(value)
+          safeLower(booking.roomName).includes(value) ||
+          safeLower(booking.date).includes(value) ||
+          safeLower(booking.slot).includes(value) ||
+          safeLower(booking.bookedBy).includes(value) ||
+          safeLower(booking.userEmail).includes(value)
         );
       })
       .map((booking) => ({
@@ -80,13 +85,41 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
         icon: <FaCalendarAlt size={13} />,
       }));
 
-    return [...userResults, ...roomResults, ...bookingResults].slice(0, 8);
-  }, [searchText, users, rooms, bookings]);
+    const requestResults = adminRequests
+      .filter((request) => {
+        return (
+          safeLower(request.roomName).includes(value) ||
+          safeLower(request.date).includes(value) ||
+          safeLower(request.slot).includes(value) ||
+          safeLower(request.requestedBy).includes(value) ||
+          safeLower(request.bookedBy).includes(value) ||
+          safeLower(request.userEmail).includes(value) ||
+          safeLower(request.status).includes(value)
+        );
+      })
+      .map((request) => ({
+        id: `request-${request.id}`,
+        type: "Request",
+        title: request.roomName,
+        subtitle: `${request.date} • ${request.slot} • ${
+          request.requestedBy || request.bookedBy || "User"
+        } • ${request.status}`,
+        section: "requests",
+        icon: <FaBell size={13} />,
+      }));
+
+    return [
+      ...userResults,
+      ...roomResults,
+      ...bookingResults,
+      ...requestResults,
+    ].slice(0, 10);
+  }, [searchText, users, rooms, bookings, adminRequests]);
 
   const handleResultClick = (result) => {
     setActiveSection(result.section);
 
-    if (result.section === "bookings") {
+    if (result.section === "bookings" && typeof setBookingView === "function") {
       setBookingView("list");
     }
 
@@ -98,22 +131,22 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
       <div className="relative">
         <FaSearch
           size={14}
-          className="absolute left-4 top-3.5 text-slate-400"
+          className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
         />
 
         <input
           type="text"
           value={searchText}
           onChange={(event) => setSearchText(event.target.value)}
-          placeholder="Search users, rooms, bookings..."
-          className="w-full pl-11 pr-11 py-3 bg-white border border-gray-300 rounded-2xl text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm"
+          placeholder="Search users, rooms, bookings, requests..."
+          className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-11 pr-11 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
 
         {searchText && (
           <button
             type="button"
             onClick={() => setSearchText("")}
-            className="absolute right-4 top-3.5 text-slate-400 hover:text-slate-700"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
           >
             <FaTimes size={13} />
           </button>
@@ -121,32 +154,32 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
       </div>
 
       {searchText && (
-        <div className="absolute left-0 right-0 top-[54px] bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden z-50">
+        <div className="absolute left-0 right-0 top-[56px] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
           {searchResults.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <div className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
               {searchResults.map((result) => (
                 <button
                   key={result.id}
                   type="button"
                   onClick={() => handleResultClick(result)}
-                  className="w-full flex items-start gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                  className="flex w-full items-start gap-3 px-4 py-3 text-left transition hover:bg-slate-50"
                 >
-                  <div className="mt-1 w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                     {result.icon}
                   </div>
 
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-semibold text-slate-900">
+                      <h4 className="truncate text-sm font-semibold text-slate-900">
                         {result.title}
                       </h4>
 
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-slate-500">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
                         {result.type}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="mt-1 truncate text-xs text-slate-500">
                       {result.subtitle}
                     </p>
                   </div>
@@ -154,14 +187,13 @@ function AdminGlobalSearch({ setActiveSection, setBookingView }) {
               ))}
             </div>
           ) : (
-            <div className="px-4 py-5 text-center">
-              <p className="text-sm font-medium text-slate-700">
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm font-semibold text-slate-700">
                 No results found
               </p>
 
-              <p className="text-xs text-slate-400 mt-1">
-                Try searching by user name, room name, date, email, role, or
-                status.
+              <p className="mt-1 text-xs text-slate-400">
+                Try searching by user, room, email, date, status, or request.
               </p>
             </div>
           )}
