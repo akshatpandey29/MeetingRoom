@@ -45,30 +45,88 @@ export const AuthProvider = ({ children }) => {
     const savedToken = localStorage.getItem("token");
     const savedUsers = localStorage.getItem("users");
 
+    let finalUsers = defaultUsers;
+
     if (savedUsers) {
-      const parsedUsers = JSON.parse(savedUsers);
+      try {
+        const parsedUsers = JSON.parse(savedUsers);
 
-      const updatedUsers = parsedUsers.map((currentUser) => ({
-        ...currentUser,
-        status: currentUser.status || "active",
-        createdAt:
-          currentUser.createdAt || new Date().toISOString().split("T")[0],
-      }));
-
-      setUsers(updatedUsers);
+        finalUsers = parsedUsers.map((currentUser) => ({
+          ...currentUser,
+          status: currentUser.status || "active",
+          createdAt:
+            currentUser.createdAt || new Date().toISOString().split("T")[0],
+        }));
+      } catch (error) {
+        finalUsers = defaultUsers;
+      }
     }
 
+    const activeAdmins = finalUsers.filter(
+      (currentUser) =>
+        currentUser.role === "admin" && currentUser.status !== "disabled"
+    );
+
+    /*
+      Safety repair:
+      If all admins were accidentally changed to users or disabled,
+      restore the default admin account automatically.
+    */
+    if (activeAdmins.length === 0) {
+      const defaultAdmin = defaultUsers[0];
+
+      const adminAlreadyExists = finalUsers.some(
+        (currentUser) => currentUser.email === defaultAdmin.email
+      );
+
+      if (adminAlreadyExists) {
+        finalUsers = finalUsers.map((currentUser) =>
+          currentUser.email === defaultAdmin.email
+            ? {
+                ...currentUser,
+                role: "admin",
+                status: "active",
+              }
+            : currentUser
+        );
+      } else {
+        finalUsers = [defaultAdmin, ...finalUsers];
+      }
+    }
+
+    setUsers(finalUsers);
+    localStorage.setItem("users", JSON.stringify(finalUsers));
+
     if (savedUser && savedToken) {
-      setUser(JSON.parse(savedUser));
-      setToken(savedToken);
+      try {
+        const parsedSavedUser = JSON.parse(savedUser);
+
+        const latestUserData = finalUsers.find(
+          (currentUser) => currentUser.id === parsedSavedUser.id
+        );
+
+        if (latestUserData && latestUserData.status !== "disabled") {
+          setUser(latestUserData);
+          setToken(savedToken);
+          localStorage.setItem("user", JSON.stringify(latestUserData));
+        } else {
+          localStorage.removeItem("user");
+          localStorage.removeItem("token");
+        }
+      } catch (error) {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
     }
 
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("users", JSON.stringify(users));
-  }, [users]);
+    if (!loading) {
+      localStorage.setItem("users", JSON.stringify(users));
+    }
+  }, [users, loading]);
 
   const login = async (loginData) => {
     try {
@@ -160,42 +218,127 @@ export const AuthProvider = ({ children }) => {
   };
 
   const changeUserRole = (userId) => {
-    setUsers((previousUsers) =>
-      previousUsers.map((currentUser) =>
-        currentUser.id === userId
-          ? {
-              ...currentUser,
-              role: currentUser.role === "admin" ? "user" : "admin",
-            }
-          : currentUser
-      )
+    const targetUser = users.find(
+      (currentUser) => Number(currentUser.id) === Number(userId)
     );
 
-    const loggedInUser = JSON.parse(localStorage.getItem("user"));
-
-    if (loggedInUser?.id === userId) {
-      const updatedLoggedInUser = {
-        ...loggedInUser,
-        role: loggedInUser.role === "admin" ? "user" : "admin",
+    if (!targetUser) {
+      return {
+        success: false,
+        message: "User not found.",
       };
-
-      localStorage.setItem("user", JSON.stringify(updatedLoggedInUser));
-      setUser(updatedLoggedInUser);
     }
+
+    /*
+      Rule 1:
+      Admin cannot change own role.
+    */
+    if (Number(user?.id) === Number(userId)) {
+      return {
+        success: false,
+        message: "You cannot change your own admin role.",
+      };
+    }
+
+    const activeAdmins = users.filter(
+      (currentUser) =>
+        currentUser.role === "admin" && currentUser.status !== "disabled"
+    );
+
+    /*
+      Rule 3:
+      At least one active admin must always remain.
+    */
+    if (targetUser.role === "admin" && activeAdmins.length <= 1) {
+      return {
+        success: false,
+        message: "At least one active admin must remain in the system.",
+      };
+    }
+
+    const updatedUsers = users.map((currentUser) =>
+      Number(currentUser.id) === Number(userId)
+        ? {
+            ...currentUser,
+            role: currentUser.role === "admin" ? "user" : "admin",
+          }
+        : currentUser
+    );
+
+    setUsers(updatedUsers);
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+
+    return {
+      success: true,
+      message: "User role updated successfully.",
+    };
   };
 
   const toggleUserStatus = (userId) => {
-    setUsers((previousUsers) =>
-      previousUsers.map((currentUser) =>
-        currentUser.id === userId
-          ? {
-              ...currentUser,
-              status:
-                currentUser.status === "active" ? "disabled" : "active",
-            }
-          : currentUser
-      )
+    const targetUser = users.find(
+      (currentUser) => Number(currentUser.id) === Number(userId)
     );
+
+    if (!targetUser) {
+      return {
+        success: false,
+        message: "User not found.",
+      };
+    }
+
+    /*
+      Rule 2:
+      Admin cannot disable own account.
+    */
+    if (
+      Number(user?.id) === Number(userId) &&
+      targetUser.status === "active"
+    ) {
+      return {
+        success: false,
+        message: "You cannot disable your own account.",
+      };
+    }
+
+    const activeAdmins = users.filter(
+      (currentUser) =>
+        currentUser.role === "admin" && currentUser.status !== "disabled"
+    );
+
+    /*
+      Rule 3:
+      At least one active admin must always remain.
+    */
+    if (
+      targetUser.role === "admin" &&
+      targetUser.status === "active" &&
+      activeAdmins.length <= 1
+    ) {
+      return {
+        success: false,
+        message: "At least one active admin must remain in the system.",
+      };
+    }
+
+    const updatedUsers = users.map((currentUser) =>
+      Number(currentUser.id) === Number(userId)
+        ? {
+            ...currentUser,
+            status: currentUser.status === "active" ? "disabled" : "active",
+          }
+        : currentUser
+    );
+
+    setUsers(updatedUsers);
+    localStorage.setItem("users", JSON.stringify(updatedUsers));
+
+    return {
+      success: true,
+      message:
+        targetUser.status === "active"
+          ? "User disabled successfully."
+          : "User enabled successfully.",
+    };
   };
 
   const logout = () => {

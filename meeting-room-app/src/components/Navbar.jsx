@@ -3,9 +3,9 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { MdMeetingRoom } from "react-icons/md";
 import {
-  FaCalendarAlt, FaTachometerAlt, FaSignOutAlt, FaUser,
+  FaTachometerAlt, FaSignOutAlt,
   FaBars, FaTimes, FaUsers, FaDoorOpen, FaCalendarCheck,
-  FaFileExport, FaBell, FaChevronDown, FaIdCard,
+  FaFileExport, FaBell, FaIdCard,
 } from "react-icons/fa";
 
 function Navbar() {
@@ -48,12 +48,11 @@ function Navbar() {
   ];
 
   const adminMobileLinks = [
-    { id: "dashboard", label: "Dashboard", icon: <FaTachometerAlt size={14} /> },
+    { id: "bookings", label: "Bookings", icon: <FaCalendarCheck size={14} /> },
+    { id: "requests", label: "Requests", icon: <FaBell size={14} /> },
     { id: "users", label: "Users", icon: <FaUsers size={14} /> },
     { id: "rooms", label: "Rooms", icon: <FaDoorOpen size={14} /> },
-    { id: "bookings", label: "Booking Management", icon: <FaCalendarCheck size={14} /> },
-    { id: "requests", label: "Booking Requests", icon: <FaBell size={14} /> },
-    { id: "exports", label: "Admin Exports", icon: <FaFileExport size={14} /> },
+    { id: "reports", label: "Reports", icon: <FaFileExport size={14} /> },
   ];
 
   const handleAdminMobileClick = (sectionId) => {

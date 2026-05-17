@@ -7,9 +7,9 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import {
-  FaUsers, FaMapMarkerAlt, FaCheckCircle, FaTimesCircle,
+  FaUsers, FaCheckCircle, FaTimesCircle,
   FaArrowLeft, FaClock, FaCalendarAlt, FaEdit, FaTrash,
-  FaBell, FaWifi, FaDoorOpen,
+  FaBell, FaDoorOpen,
 } from "react-icons/fa";
 
 import { useRooms } from "../context/RoomContext";

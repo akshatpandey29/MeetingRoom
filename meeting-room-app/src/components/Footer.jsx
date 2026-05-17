@@ -1,5 +1,4 @@
 import { MdMeetingRoom } from 'react-icons/md';
-import { FaGithub, FaLinkedin } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
