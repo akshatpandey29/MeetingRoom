@@ -5,7 +5,6 @@ import {
   FaCheckCircle, FaTimesCircle, FaEdit, FaSave, FaTimes,
   FaShieldAlt, FaCalendarAlt,
 } from 'react-icons/fa';
-import { MdMeetingRoom } from 'react-icons/md';
 
 // ── password strength ─────────────────────────────────────────────────────────
 function getStrength(pwd) {

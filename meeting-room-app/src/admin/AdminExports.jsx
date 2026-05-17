@@ -1,19 +1,15 @@
 import { useState } from "react";
 import * as XLSX from "xlsx";
 import {
-  FaCalendarAlt,
   FaChevronDown,
   FaFileExcel,
   FaFilePdf,
   FaDownload,
   FaTimesCircle,
   FaCheckCircle,
-  FaFileExport,
-  FaTable,
-  FaUsers,
 } from "react-icons/fa";
 
-function AdminExports({ bookings }) {
+function AdminExports({ bookings = [] }) {
   const [selectedDuration, setSelectedDuration] = useState("all");
 
   const [message, setMessage] = useState({
@@ -34,13 +30,17 @@ function AdminExports({ bookings }) {
     durationOptions.find((option) => option.value === selectedDuration)
       ?.label || "All Bookings";
 
+  const getTodayDate = () => {
+    return new Date().toISOString().split("T")[0];
+  };
+
   const formatDisplayDate = (dateValue) => {
     if (!dateValue) return "Not available";
 
     const date = new Date(dateValue);
 
     if (Number.isNaN(date.getTime())) {
-      return "Not available";
+      return String(dateValue);
     }
 
     return date.toLocaleDateString("en-IN", {
@@ -48,6 +48,83 @@ function AdminExports({ bookings }) {
       month: "short",
       year: "numeric",
     });
+  };
+
+  const formatDisplayDateTime = (dateValue) => {
+    if (!dateValue) return "";
+
+    const date = new Date(dateValue);
+
+    if (Number.isNaN(date.getTime())) {
+      return String(dateValue);
+    }
+
+    return date.toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getBookingStatus = (booking) => {
+    if (booking.status) return booking.status;
+
+    if (!booking.date) return "unknown";
+
+    if (booking.date < getTodayDate()) return "completed";
+
+    return "upcoming";
+  };
+
+  const getActionHistory = (booking) => {
+    if (
+      Array.isArray(booking.actionHistory) &&
+      booking.actionHistory.length > 0
+    ) {
+      return booking.actionHistory
+        .map((historyItem) => {
+          const action =
+            historyItem.action ||
+            historyItem.type ||
+            historyItem.message ||
+            "Updated";
+
+          const by =
+            historyItem.by ||
+            historyItem.performedBy ||
+            historyItem.actionBy ||
+            "Admin";
+
+          const date =
+            historyItem.date ||
+            historyItem.createdAt ||
+            historyItem.timestamp ||
+            "";
+
+          return date
+            ? `${action} by ${by} on ${formatDisplayDateTime(date)}`
+            : `${action} by ${by}`;
+        })
+        .join(" | ");
+    }
+
+    if (booking.createdByAdmin) return "Created by Admin";
+
+    if (booking.source === "admin-request") {
+      return "Created from approved request";
+    }
+
+    if (booking.rescheduledBy) {
+      return `Rescheduled by ${booking.rescheduledBy}`;
+    }
+
+    if (booking.cancelledBy) {
+      return `Cancelled by ${booking.cancelledBy}`;
+    }
+
+    return "Created";
   };
 
   const isBookingInsideSelectedDuration = (booking) => {
@@ -99,19 +176,15 @@ function AdminExports({ bookings }) {
 
   const filteredBookings = bookings.filter(isBookingInsideSelectedDuration);
 
-  const uniqueUsers = new Set(
-    filteredBookings
-      .map((booking) => booking.userEmail)
-      .filter((email) => Boolean(email))
-  );
-
   const exportData = filteredBookings.map((booking, index) => ({
     serialNo: index + 1,
-    roomName: booking.roomName || "Not available",
+    employeeName: booking.bookedBy || booking.userName || "Unknown",
+    email: booking.userEmail || "Not available",
+    room: booking.roomName || "Not available",
     date: formatDisplayDate(booking.date),
-    slot: booking.slot || "Not available",
-    bookedBy: booking.bookedBy || "Unknown",
-    userEmail: booking.userEmail || "Not available",
+    time: booking.slot || booking.time || "Not available",
+    status: getBookingStatus(booking),
+    actionHistory: getActionHistory(booking),
   }));
 
   const showMessage = (text, type) => {
@@ -130,87 +203,66 @@ function AdminExports({ bookings }) {
 
   const checkDataAvailable = () => {
     if (exportData.length === 0) {
-      showMessage("No booking records available for selected duration.", "error");
+      showMessage(
+        "No booking records available for the selected duration.",
+        "error"
+      );
       return false;
     }
 
     return true;
   };
 
-  const exportAsExcel = () => {
-    if (!checkDataAvailable()) return;
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-    worksheet["!cols"] = [
-      { wch: 8 },
-      { wch: 24 },
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 28 },
-    ];
-
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Booking Report");
-
-    XLSX.writeFile(workbook, `booking-report-${selectedDuration}.xlsx`);
-
-    showMessage("Excel report downloaded successfully.", "success");
+  const escapeHtml = (value) => {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   };
 
-  const exportAsCSV = () => {
-    if (!checkDataAvailable()) return;
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const csvOutput = XLSX.utils.sheet_to_csv(worksheet);
-
-    const blob = new Blob([csvOutput], {
-      type: "text/csv;charset=utf-8;",
-    });
-
+  const downloadTextFile = (content, fileName, fileType) => {
+    const blob = new Blob([content], { type: fileType });
     const url = URL.createObjectURL(blob);
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `booking-report-${selectedDuration}.csv`;
+    link.download = fileName;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
-
-    showMessage("CSV report downloaded successfully.", "success");
   };
 
-  const exportAsPDF = () => {
-    if (!checkDataAvailable()) return;
-
-    const printWindow = window.open("", "_blank");
-
-    if (!printWindow) {
-      showMessage("Please allow popups to export PDF report.", "error");
-      return;
-    }
-
+  const getReportHtml = ({ autoPrint = false }) => {
     const rows = exportData
       .map(
         (booking) => `
           <tr>
-            <td>${booking.serialNo}</td>
-            <td>${booking.roomName}</td>
-            <td>${booking.date}</td>
-            <td>${booking.slot}</td>
-            <td>${booking.bookedBy}</td>
-            <td>${booking.userEmail}</td>
+            <td>${escapeHtml(booking.serialNo)}</td>
+            <td>${escapeHtml(booking.employeeName)}</td>
+            <td>${escapeHtml(booking.email)}</td>
+            <td>${escapeHtml(booking.room)}</td>
+            <td>${escapeHtml(booking.date)}</td>
+            <td>${escapeHtml(booking.time)}</td>
+            <td>
+              <span class="status-badge">${escapeHtml(booking.status)}</span>
+            </td>
+            <td>${escapeHtml(booking.actionHistory)}</td>
           </tr>
         `
       )
       .join("");
 
-    printWindow.document.write(`
+    return `
+      <!DOCTYPE html>
       <html>
         <head>
+          <meta charset="UTF-8" />
           <title>Booking Report</title>
+
           <style>
             * {
               box-sizing: border-box;
@@ -263,7 +315,7 @@ function AdminExports({ bookings }) {
             table {
               width: 100%;
               border-collapse: collapse;
-              font-size: 11px;
+              font-size: 10px;
               table-layout: fixed;
             }
 
@@ -281,15 +333,69 @@ function AdminExports({ bookings }) {
               border: 1px solid #d1d5db;
               color: #334155;
               word-wrap: break-word;
+              vertical-align: top;
             }
 
             tr:nth-child(even) {
               background: #f8fafc;
             }
 
+            .status-badge {
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 999px;
+              background: #dbeafe;
+              color: #1d4ed8;
+              font-size: 10px;
+              font-weight: 700;
+              text-transform: capitalize;
+            }
+
+            .print-note {
+              margin-top: 18px;
+              color: #64748b;
+              font-size: 12px;
+            }
+
+            .col-small {
+              width: 5%;
+            }
+
+            .col-employee {
+              width: 14%;
+            }
+
+            .col-email {
+              width: 18%;
+            }
+
+            .col-room {
+              width: 15%;
+            }
+
+            .col-date {
+              width: 11%;
+            }
+
+            .col-time {
+              width: 13%;
+            }
+
+            .col-status {
+              width: 9%;
+            }
+
+            .col-history {
+              width: 15%;
+            }
+
             @media print {
               body {
                 padding: 18px;
+              }
+
+              .print-note {
+                display: none;
               }
 
               table {
@@ -312,214 +418,321 @@ function AdminExports({ bookings }) {
           </div>
 
           <div class="summary-box">
-            Duration: ${selectedDurationLabel} &nbsp; | &nbsp;
+            Duration: ${escapeHtml(selectedDurationLabel)} &nbsp; | &nbsp;
             Total Records: ${exportData.length}
           </div>
 
           <table>
             <thead>
               <tr>
-                <th>S.No</th>
-                <th>Room Name</th>
-                <th>Date</th>
-                <th>Slot</th>
-                <th>Booked By</th>
-                <th>User Email</th>
+                <th class="col-small">S.No</th>
+                <th class="col-employee">Employee Name</th>
+                <th class="col-email">Email</th>
+                <th class="col-room">Room</th>
+                <th class="col-date">Date</th>
+                <th class="col-time">Time</th>
+                <th class="col-status">Status</th>
+                <th class="col-history">Action History</th>
               </tr>
             </thead>
+
             <tbody>
               ${rows}
             </tbody>
           </table>
+
+          <p class="print-note">
+            For PDF download: choose Destination as "Save as PDF" in the print dialog.
+          </p>
+
+          ${
+            autoPrint
+              ? `
+                <script>
+                  window.onload = function () {
+                    setTimeout(function () {
+                      window.print();
+                    }, 400);
+                  };
+                </script>
+              `
+              : ""
+          }
         </body>
       </html>
-    `);
+    `;
+  };
 
-    printWindow.document.close();
+  const openReportPreview = ({ autoPrint = false }) => {
+    const reportWindow = window.open("", "_blank");
 
-    setTimeout(() => {
-      printWindow.print();
-    }, 300);
+    if (!reportWindow) {
+      showMessage("Please allow popups to open the report preview.", "error");
+      return false;
+    }
+
+    reportWindow.document.open("text/html");
+    reportWindow.document.write(
+      getReportHtml({
+        autoPrint,
+      })
+    );
+    reportWindow.document.close();
+
+    return true;
+  };
+
+  const exportAsExcel = () => {
+    if (!checkDataAvailable()) return;
+
+    const excelRows = exportData.map((booking) => ({
+      "S.No": booking.serialNo,
+      "Employee Name": booking.employeeName,
+      Email: booking.email,
+      Room: booking.room,
+      Date: booking.date,
+      Time: booking.time,
+      Status: booking.status,
+      "Action History": booking.actionHistory,
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelRows);
+
+    worksheet["!cols"] = [
+      { wch: 8 },
+      { wch: 24 },
+      { wch: 34 },
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 24 },
+      { wch: 16 },
+      { wch: 55 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Booking Report");
+
+    XLSX.writeFile(workbook, `booking-report-${selectedDuration}.xlsx`, {
+      bookType: "xlsx",
+    });
+
+    openReportPreview({
+      autoPrint: false,
+    });
+
+    showMessage("Excel .xlsx report downloaded and preview opened.", "success");
+  };
+
+  const exportAsCSV = () => {
+    if (!checkDataAvailable()) return;
+
+    const headers = [
+      "S.No",
+      "Employee Name",
+      "Email",
+      "Room",
+      "Date",
+      "Time",
+      "Status",
+      "Action History",
+    ];
+
+    const rows = exportData.map((booking) => [
+      booking.serialNo,
+      booking.employeeName,
+      booking.email,
+      booking.room,
+      booking.date,
+      booking.time,
+      booking.status,
+      booking.actionHistory,
+    ]);
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map((row) =>
+        row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")
+      ),
+    ].join("\n");
+
+    downloadTextFile(
+      csvContent,
+      `booking-report-${selectedDuration}.csv`,
+      "text/csv;charset=utf-8;"
+    );
+
+    openReportPreview({
+      autoPrint: false,
+    });
+
+    showMessage("CSV report downloaded and preview opened.", "success");
+  };
+
+  const exportAsPDF = () => {
+    if (!checkDataAvailable()) return;
+
+    const opened = openReportPreview({
+      autoPrint: true,
+    });
+
+    if (!opened) return;
 
     showMessage(
-      "PDF report is ready. Choose Save as PDF in print window.",
+      "PDF preview opened. In the print dialog, choose Save as PDF.",
       "success"
     );
   };
 
   return (
-    <div className="space-y-4">
-      {message.text && (
-        <div
-          className={`px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${
-            message.type === "success"
-              ? "bg-green-50 border-green-100 text-green-700"
-              : "bg-red-50 border-red-100 text-red-600"
-          }`}
-        >
-          {message.type === "success" ? (
-            <FaCheckCircle size={14} />
-          ) : (
-            <FaTimesCircle size={14} />
-          )}
-          <span>{message.text}</span>
-        </div>
-      )}
+    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+      <div className="p-6 border-b border-gray-100">
+        <p className="text-sm font-medium text-blue-600 mb-2">
+          Admin Exports
+        </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <ReportInfoCard
-          icon={<FaTable />}
-          title="Booking Records"
-          value={filteredBookings.length}
-          helper="Records available for selected duration"
-          color="blue"
-        />
+        <h2 className="text-xl font-semibold text-slate-900">
+          Download Booking Reports
+        </h2>
 
-        <ReportInfoCard
-          icon={<FaCalendarAlt />}
-          title="Duration"
-          value={selectedDurationLabel}
-          helper="Current report filter"
-          color="purple"
-        />
-
-        <ReportInfoCard
-          icon={<FaUsers />}
-          title="Unique Users"
-          value={uniqueUsers.size}
-          helper="Employees in filtered report"
-          color="green"
-        />
+        <p className="text-sm text-slate-500 mt-1">
+          Export booking records by selected duration.
+        </p>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <FaFileExport size={14} />
-            </div>
+      <div className="p-6">
+        {message.text && (
+          <div
+            className={`mb-5 px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${
+              message.type === "success"
+                ? "bg-green-50 border-green-100 text-green-700"
+                : "bg-red-50 border-red-100 text-red-600"
+            }`}
+          >
+            {message.type === "success" ? (
+              <FaCheckCircle size={14} />
+            ) : (
+              <FaTimesCircle size={14} />
+            )}
+            <span>{message.text}</span>
+          </div>
+        )}
 
-            <div>
-              <h2 className="text-base font-semibold text-slate-900">
-                Reports & Exports
-              </h2>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-5">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-2">
+              Duration
+            </label>
 
-              <p className="text-xs text-slate-500 mt-0.5">
-                Download booking data in Excel, PDF, or CSV format.
-              </p>
+            <div className="relative">
+              <select
+                value={selectedDuration}
+                onChange={(event) => {
+                  setSelectedDuration(event.target.value);
+                  setMessage({
+                    text: "",
+                    type: "",
+                  });
+                }}
+                className="w-full appearance-none px-4 py-3 pr-10 border border-gray-300 rounded-xl text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {durationOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <FaChevronDown
+                size={12}
+                className="absolute right-4 top-4 text-slate-400 pointer-events-none"
+              />
             </div>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4">
+            <p className="text-sm font-semibold text-blue-800">
+              Ready to export
+            </p>
+
+            <p className="text-sm text-blue-700 mt-1">
+              {exportData.length} booking records are available for export.
+            </p>
           </div>
         </div>
 
-        <div className="p-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-end">
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
-                Select Duration
-              </label>
+        {exportData.length === 0 ? (
+          <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
+            <p className="text-sm font-semibold text-slate-700">
+              No report data found
+            </p>
 
-              <div className="relative">
-                <FaCalendarAlt
-                  size={13}
-                  className="absolute left-3.5 top-3 text-slate-400"
-                />
-
-                <select
-                  value={selectedDuration}
-                  onChange={(event) => {
-                    setSelectedDuration(event.target.value);
-                    setMessage({
-                      text: "",
-                      type: "",
-                    });
-                  }}
-                  className="w-full appearance-none pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  {durationOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-
-                <FaChevronDown
-                  size={12}
-                  className="absolute right-4 top-3.5 text-slate-400 pointer-events-none"
-                />
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
-              <p className="text-sm font-semibold text-blue-800">
-                {filteredBookings.length} records ready
-              </p>
-
-              <p className="text-xs text-blue-700 mt-1">
-                Report duration: {selectedDurationLabel}
-              </p>
-            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Change the duration filter or create bookings to generate reports.
+            </p>
           </div>
-
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="button"
+        ) : (
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <ExportCard
+              icon={<FaFileExcel />}
+              title="Excel Report"
+              description="Downloads a real .xlsx file and opens report preview."
+              buttonText="Export Excel"
+              buttonClass="bg-green-50 text-green-700 hover:bg-green-100"
               onClick={exportAsExcel}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors"
-            >
-              <FaFileExcel size={13} />
-              Export Excel
-            </button>
+            />
 
-            <button
-              type="button"
+            <ExportCard
+              icon={<FaFilePdf />}
+              title="PDF Report"
+              description="Opens printable PDF preview in a new tab."
+              buttonText="Export PDF"
+              buttonClass="bg-slate-100 text-slate-700 hover:bg-slate-200"
               onClick={exportAsPDF}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-            >
-              <FaFilePdf size={13} />
-              Export PDF
-            </button>
+            />
 
-            <button
-              type="button"
+            <ExportCard
+              icon={<FaDownload />}
+              title="CSV Report"
+              description="Downloads CSV file and opens report preview."
+              buttonText="Export CSV"
+              buttonClass="bg-blue-50 text-blue-700 hover:bg-blue-100"
               onClick={exportAsCSV}
-              className="flex items-center gap-2 px-3 py-2 text-xs font-semibold bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-            >
-              <FaDownload size={13} />
-              Export CSV
-            </button>
+            />
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
 }
 
-function ReportInfoCard({ icon, title, value, helper, color }) {
-  const styles = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-green-50 text-green-600",
-    purple: "bg-purple-50 text-purple-600",
-  };
-
+function ExportCard({
+  icon,
+  title,
+  description,
+  buttonText,
+  buttonClass,
+  onClick,
+}) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 flex items-center gap-3">
-      <div
-        className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-          styles[color] || styles.blue
-        }`}
-      >
+    <div className="border border-gray-200 rounded-2xl p-5">
+      <div className="w-11 h-11 rounded-xl bg-slate-50 text-blue-600 flex items-center justify-center mb-5">
         {icon}
       </div>
 
-      <div>
-        <p className="text-xs text-slate-500">{title}</p>
+      <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
 
-        <h3 className="text-lg font-bold text-slate-900 leading-tight">
-          {value}
-        </h3>
+      <p className="text-sm text-slate-500 mt-2 min-h-[44px]">
+        {description}
+      </p>
 
-        <p className="text-[11px] text-slate-400 mt-0.5">{helper}</p>
-      </div>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${buttonClass}`}
+      >
+        {icon}
+        {buttonText}
+      </button>
     </div>
   );
 }

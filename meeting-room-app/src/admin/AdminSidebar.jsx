@@ -30,7 +30,7 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
       icon: <FaDoorOpen size={13} />,
     },
     {
-      id: "exports",
+      id: "reports",
       label: "Reports",
       icon: <FaFileExport size={13} />,
     },

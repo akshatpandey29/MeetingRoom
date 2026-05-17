@@ -47,6 +47,12 @@ const defaultSlots = [
   "04:00 - 05:00",
 ];
 
+const createActionLog = (action, by = "System") => ({
+  action,
+  by,
+  at: new Date().toISOString(),
+});
+
 export function RoomProvider({ children }) {
   const [rooms, setRooms] = useState(() => {
     const saved = localStorage.getItem('rooms');
@@ -124,7 +130,19 @@ export function RoomProvider({ children }) {
     return slots.filter((slot) => !bookedSlots.includes(slot));
   };
 
-  const bookSlot = ({ roomId, roomName, date, slot, bookedBy, userEmail, startTime, endTime }) => {
+  const bookSlot = ({
+    roomId,
+    roomName,
+    date,
+    slot,
+    bookedBy,
+    userEmail,
+    startTime,
+    endTime,
+    source = "direct-booking",
+    requestId = null,
+    actionHistory = [],
+  }) => {
     const alreadyBooked = bookings.some(
       (booking) =>
         booking.roomId === Number(roomId) &&
@@ -146,7 +164,13 @@ export function RoomProvider({ children }) {
       userEmail,
       startTime: startTime || '',
       endTime: endTime || '',
+      source,
+      requestId,
       createdAt: new Date().toISOString(),
+      actionHistory:
+        actionHistory.length > 0
+          ? actionHistory
+          : [createActionLog("Booking created", bookedBy || "Employee")],
     };
 
     setBookings((prev) => [...prev, newBooking]);
@@ -157,7 +181,14 @@ export function RoomProvider({ children }) {
     setBookings((prev) => prev.filter((booking) => booking.id !== bookingId));
   };
 
-  const rescheduleBooking = ({ bookingId, newDate, newSlot, newStartTime, newEndTime }) => {
+  const rescheduleBooking = ({
+    bookingId,
+    newDate,
+    newSlot,
+    newStartTime,
+    newEndTime,
+    actionBy = "Admin",
+  }) => {
     const bookingToUpdate = bookings.find((booking) => booking.id === bookingId);
     if (!bookingToUpdate) {
       return { success: false, message: 'Booking not found.' };
@@ -185,6 +216,10 @@ export function RoomProvider({ children }) {
               startTime: newStartTime || booking.startTime,
               endTime: newEndTime || booking.endTime,
               updatedAt: new Date().toISOString(),
+              actionHistory: [
+                ...(booking.actionHistory || []),
+                createActionLog("Booking rescheduled", actionBy),
+              ],
             }
           : booking
       )
@@ -200,15 +235,32 @@ export function RoomProvider({ children }) {
       ...requestData,
       status: 'pending',
       createdAt: new Date().toISOString(),
+      actionHistory: [
+        createActionLog(
+          "Booking request created",
+          requestData.requestedBy || requestData.bookedBy || "Employee"
+        ),
+      ],
     };
     setAdminRequests((prev) => [...prev, newRequest]);
     return { success: true, message: 'Request sent to admin.' };
   };
 
-  const updateAdminRequest = (requestId, status) => {
+  const updateAdminRequest = (requestId, status, meta = {}) => {
     setAdminRequests((prev) =>
       prev.map((req) =>
-        req.id === requestId ? { ...req, status } : req
+        req.id === requestId
+          ? {
+              ...req,
+              status,
+              reviewedAt: new Date().toISOString(),
+              reviewedBy: meta.reviewedBy || "Admin",
+              actionHistory: [
+                ...(req.actionHistory || []),
+                createActionLog(`Request ${status}`, meta.reviewedBy || "Admin"),
+              ],
+            }
+          : req
       )
     );
   };

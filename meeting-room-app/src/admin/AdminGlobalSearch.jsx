@@ -11,7 +11,7 @@ import { useRooms } from "../context/RoomContext";
 import { useAuth } from "../context/AuthContext";
 
 function AdminGlobalSearch({ setActiveSection, setBookingView }) {
-  const { rooms, bookings, adminRequests } = useRooms();
+  const { rooms, bookings, adminRequests = [] } = useRooms();
   const { users } = useAuth();
 
   const [searchText, setSearchText] = useState("");

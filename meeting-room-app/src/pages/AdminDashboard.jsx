@@ -1,37 +1,36 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
+  FaCheckCircle,
+  FaTimesCircle,
+  FaPlus,
+  FaEdit,
+  FaTrash,
+  FaPowerOff,
+  FaMapMarkerAlt,
+  FaUsers,
+  FaDoorOpen,
   FaBell,
-  FaBuilding,
   FaCalendarAlt,
   FaCheck,
-  FaCheckCircle,
   FaClock,
-  FaDownload,
-  FaEdit,
   FaFileCsv,
-  FaFileExcel,
-  FaFilePdf,
   FaFilter,
   FaList,
-  FaPlus,
   FaSearch,
   FaThLarge,
   FaTimes,
-  FaTimesCircle,
-  FaTrash,
   FaUser,
-  FaUsers,
 } from "react-icons/fa";
-import { useEffect } from "react";
-import AdminSidebar from "../admin/AdminSidebar";
-import AdminGlobalSearch from "../admin/AdminGlobalSearch";
-import UserManagement from "../admin/UserManagement";
-import AdminExports from "../admin/AdminExports";
 
+import ConfirmModal from "../components/ConfirmModal";
 import DateSelector from "../components/DateSelector";
 import TimePickerWheel from "../components/TimePickerWheel";
 import { useRooms } from "../context/RoomContext";
 import { useAuth } from "../context/AuthContext";
+import AdminExports from "../admin/AdminExports";
+import AdminSidebar from "../admin/AdminSidebar";
+import AdminGlobalSearch from "../admin/AdminGlobalSearch";
+import UserManagement from "../admin/UserManagement";
 
 function AdminDashboard() {
   const {
@@ -51,7 +50,7 @@ function AdminDashboard() {
   const { users, normalUsers, changeUserRole, toggleUserStatus } = useAuth();
 
   const [activeSection, setActiveSection] = useState("bookings");
-  const [globalSearch, setGlobalSearch] = useState("");
+  const [globalSearch] = useState("");
 
   const [toast, setToast] = useState({
     show: false,
@@ -122,34 +121,103 @@ function AdminDashboard() {
       showToast("success", "Room deleted successfully.");
     }
 
-    if (type === "toggleRoom") {
-      toggleRoomActive(payload);
-      showToast("success", "Room status updated successfully.");
+    if (type === "toggleRoom" || type === "toggleRoomActive") {
+  toggleRoomActive(payload);
+  showToast("success", "Room visibility updated successfully.");
+}
+
+if (type === "changeRoomStatus") {
+  const selectedRoom = rooms.find(
+    (room) => Number(room.id) === Number(payload)
+  );
+
+  if (!selectedRoom) {
+    showToast("error", "Room not found.");
+    closeModal();
+    return;
+  }
+
+  updateRoom(selectedRoom.id, {
+    ...selectedRoom,
+    status:
+      selectedRoom.status === "available" ? "unavailable" : "available",
+  });
+
+  showToast("success", "Room availability status updated successfully.");
+}
+
+    if (type === "rejectRequest") {
+      updateAdminRequest(payload.id, "rejected");
+      showToast("success", "Request rejected successfully.");
+    }
+
+    if (type === "approveRequest") {
+      const room = rooms.find((item) => Number(item.id) === Number(payload.roomId));
+
+      if (!room) {
+        showToast("error", "Room no longer exists. Request cannot be approved.");
+        closeModal();
+        return;
+      }
+
+      const requestStartTime = payload.startTime || getStartFromSlot(payload.slot);
+      const requestEndTime = payload.endTime || getEndFromSlot(payload.slot);
+
+      const conflict = hasBookingConflict({
+        bookings,
+        roomId: payload.roomId,
+        date: payload.date,
+        startTime: requestStartTime,
+        endTime: requestEndTime,
+      });
+
+      if (conflict) {
+        showToast("error", "This request conflicts with an existing booking.");
+        closeModal();
+        return;
+      }
+
+      const slot = `${formatTime(requestStartTime)} - ${formatTime(requestEndTime)}`;
+
+      const result = bookSlot({
+        roomId: room.id,
+        roomName: room.name,
+        date: payload.date,
+        slot,
+        startTime: requestStartTime,
+        endTime: requestEndTime,
+        bookedBy: payload.requestedBy || payload.bookedBy || "Employee",
+        userEmail: payload.userEmail || "",
+      });
+
+      if (!result.success) {
+        showToast("error", result.message || "Request could not be approved.");
+        closeModal();
+        return;
+      }
+
+      updateAdminRequest(payload.id, "approved");
+      showToast("success", "Request approved and booking created successfully.");
     }
 
     if (type === "changeRole") {
-      changeUserRole(payload);
-      showToast("success", "User role updated successfully.");
+      const result = changeUserRole(payload);
+      showToast(
+        result?.success === false ? "error" : "success",
+        result?.message || "User role updated successfully."
+      );
     }
 
     if (type === "toggleUser") {
-      toggleUserStatus(payload);
-      showToast("success", "User status updated successfully.");
+      const result = toggleUserStatus(payload);
+      showToast(
+        result?.success === false ? "error" : "success",
+        result?.message || "User status updated successfully."
+      );
     }
 
     closeModal();
   }
-  useEffect(() => {
-  const handleAdminSectionChange = (event) => {
-    setActiveSection(event.detail);
-  };
-
-  window.addEventListener("change-admin-section", handleAdminSectionChange);
-
-  return () => {
-    window.removeEventListener("change-admin-section", handleAdminSectionChange);
-  };
-}, []);
 
   return (
     <section className="min-h-screen bg-slate-50 px-4 py-5 md:px-6">
@@ -169,26 +237,14 @@ function AdminDashboard() {
             </p>
           </div>
 
-          <div className="relative">
-            <FaSearch
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-              size={13}
-            />
-
-            <input
-              type="text"
-              value={globalSearch}
-              onChange={(event) => setGlobalSearch(event.target.value)}
-              placeholder="Search users, rooms, bookings..."
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-          </div>
+          <AdminGlobalSearch setActiveSection={setActiveSection} setBookingView={() => {}} />
         </div>
-
-        {toast.show && <Toast type={toast.type} message={toast.message} />}
+        {toast.show && (
+          <Toast type={toast.type} message={toast.message} />
+        )}
 
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[220px_1fr]">
-          <AdminSidePanel
+          <AdminSidebar
             activeSection={activeSection}
             setActiveSection={setActiveSection}
             pendingCount={
@@ -219,129 +275,105 @@ function AdminDashboard() {
                 globalSearch={globalSearch}
                 bookSlot={bookSlot}
                 updateAdminRequest={updateAdminRequest}
+                openModal={openModal}
                 showToast={showToast}
               />
             )}
 
-            {activeSection === "users" && (
-              <UsersSection
-                users={users}
-                globalSearch={globalSearch}
-                openModal={openModal}
-              />
-            )}
+            {activeSection === "users" && <UserManagement />}
 
             {activeSection === "rooms" && (
               <RoomsSection
                 rooms={rooms}
                 addRoom={addRoom}
                 updateRoom={updateRoom}
+                deleteRoom={deleteRoom}
+                toggleRoomActive={toggleRoomActive}
                 openModal={openModal}
                 showToast={showToast}
               />
             )}
 
             {activeSection === "reports" && (
-              <ReportsSection bookings={bookings} rooms={rooms} users={users} />
+              <AdminExports bookings={bookings} rooms={rooms} users={users} />
             )}
           </main>
         </div>
       </div>
 
-      <ProfessionalModal
-        open={modalData.open}
+      <ConfirmModal
+        isOpen={modalData.open}
         title={modalData.title}
         message={modalData.message}
         confirmText={modalData.confirmText}
-        tone={modalData.tone}
-        onClose={closeModal}
+        cancelText="No, Keep it"
+        tone={modalData.tone || "red"}
+        onCancel={closeModal}
         onConfirm={handleConfirmModal}
       />
     </section>
   );
 }
 
-/* -------------------------------------------------------------------------- */
-/* Sidebar */
-/* -------------------------------------------------------------------------- */
 
-function AdminSidePanel({ activeSection, setActiveSection, pendingCount }) {
-  const sidebarItems = [
-    {
-      key: "bookings",
-      label: "Bookings",
-      icon: <FaCalendarAlt />,
-    },
-    {
-      key: "requests",
-      label: "Requests",
-      icon: <FaBell />,
-      count: pendingCount,
-    },
-    {
-      key: "users",
-      label: "Users",
-      icon: <FaUsers />,
-    },
-    {
-      key: "rooms",
-      label: "Rooms",
-      icon: <FaBuilding />,
-    },
-    {
-      key: "reports",
-      label: "Reports",
-      icon: <FaDownload />,
-    },
-  ];
+function getBookingDateTime(booking) {
+  const bookingDate = booking.date || "";
 
-  return (
-    <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="px-2 pb-3">
-        <h2 className="text-base font-bold text-slate-900">Admin</h2>
-        <p className="mt-1 text-xs leading-5 text-slate-500">
-          Office booking controls.
-        </p>
-      </div>
+  const bookingStartTime =
+    booking.startTime ||
+    booking.slot?.split("-")[0]?.trim() ||
+    booking.time?.split("-")[0]?.trim() ||
+    "00:00";
 
-      <div className="space-y-1 border-t border-slate-100 pt-3">
-        {sidebarItems.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setActiveSection(item.key)}
-            className={`flex h-10 w-full items-center justify-between rounded-xl px-3 text-sm font-semibold transition ${
-              activeSection === item.key
-                ? "bg-blue-600 text-white shadow-sm"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <span className="text-sm">{item.icon}</span>
-              {item.label}
-            </span>
+  const formattedTime = convertTo24HourTime(bookingStartTime);
 
-            {item.count > 0 && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                  activeSection === item.key
-                    ? "bg-white text-blue-600"
-                    : "bg-amber-100 text-amber-700"
-                }`}
-              >
-                {item.count}
-              </span>
-            )}
-          </button>
-        ))}
-      </div>
-    </aside>
-  );
+  const dateTime = new Date(`${bookingDate}T${formattedTime}`);
+
+  if (Number.isNaN(dateTime.getTime())) {
+    return new Date(`${bookingDate}T00:00`);
+  }
+
+  return dateTime;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Bookings */
-/* -------------------------------------------------------------------------- */
+function convertTo24HourTime(timeValue) {
+  if (!timeValue) return "00:00";
+
+  const cleanTime = String(timeValue).trim();
+
+  // Already 24-hour format: 09:30
+  if (/^\d{2}:\d{2}$/.test(cleanTime)) {
+    return cleanTime;
+  }
+
+  // Handles 9:30, 9:00, 14:30
+  if (/^\d{1,2}:\d{2}$/.test(cleanTime)) {
+    const [hours, minutes] = cleanTime.split(":");
+
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+
+  // Handles 9:30 AM, 09:30 AM, 2:00 PM
+  const match = cleanTime.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+
+  if (!match) {
+    return "00:00";
+  }
+
+  let hours = Number(match[1]);
+  const minutes = match[2];
+  const period = match[3].toUpperCase();
+
+  if (period === "PM" && hours !== 12) {
+    hours += 12;
+  }
+
+  if (period === "AM" && hours === 12) {
+    hours = 0;
+  }
+
+  return `${String(hours).padStart(2, "0")}:${minutes}`;
+}
 
 function BookingsSection({
   rooms,
@@ -392,7 +424,8 @@ function BookingsSection({
     (room) => room.isActive && room.status === "available"
   );
 
-  const filteredBookings = bookings.filter((booking) => {
+  const filteredBookings = bookings
+  .filter((booking) => {
     const combinedSearch = `${globalSearch} ${bookingSearch}`
       .trim()
       .toLowerCase();
@@ -416,26 +449,32 @@ function BookingsSection({
       (statusFilter === "completed" && booking.date < getTodayDate());
 
     return matchesSearch && matchesDate && matchesRoom && matchesStatus;
+  })
+  .sort((firstBooking, secondBooking) => {
+    const firstDateTime = getBookingDateTime(firstBooking);
+    const secondDateTime = getBookingDateTime(secondBooking);
+
+    return firstDateTime - secondDateTime;
   });
 
   function handleEmployeeSelect(value) {
-    const selectedUser = users.find((user) => String(user.id) === value);
+  const selectedUser = users.find((user) => String(user.id) === value);
 
-    if (!selectedUser) {
-      setBookingForm((previous) => ({
-        ...previous,
-        employeeName: "",
-        employeeEmail: "",
-      }));
-      return;
-    }
-
+  if (!selectedUser) {
     setBookingForm((previous) => ({
       ...previous,
-      employeeName: selectedUser.name,
-      employeeEmail: selectedUser.email,
+      employeeName: "",
+      employeeEmail: "",
     }));
+    return;
   }
+
+  setBookingForm((previous) => ({
+    ...previous,
+    employeeName: selectedUser.name,
+    employeeEmail: selectedUser.email,
+  }));
+}
 
   function handleCreateBooking() {
     if (!bookingForm.employeeName.trim()) {
@@ -840,7 +879,7 @@ function BookingsSection({
                     title: "Cancel Booking",
                     message:
                       "Are you sure you want to cancel this booking? This action cannot be undone.",
-                    confirmText: "Cancel Booking",
+                    confirmText: "Yes, Cancel",
                     tone: "red",
                     payload: booking.id,
                   })
@@ -876,6 +915,7 @@ function RequestsSection({
   globalSearch,
   bookSlot,
   updateAdminRequest,
+  openModal,
   showToast,
 }) {
   const [requestFilter, setRequestFilter] = useState("all");
@@ -969,33 +1009,25 @@ function RequestsSection({
       return;
     }
 
-    const slot = `${formatTime(requestStartTime)} - ${formatTime(
-      requestEndTime
-    )}`;
-
-    const result = bookSlot({
-      roomId: room.id,
-      roomName: room.name,
-      date: request.date,
-      slot,
-      startTime: requestStartTime,
-      endTime: requestEndTime,
-      bookedBy: request.requestedBy || request.bookedBy || "Employee",
-      userEmail: request.userEmail || "",
+    openModal({
+      type: "approveRequest",
+      title: "Approve Booking Request",
+      message: `Approve this request for ${request.roomName} on ${request.date}? A confirmed booking will be created for the employee.`,
+      confirmText: "Yes, Approve",
+      tone: "green",
+      payload: request,
     });
-
-    if (!result.success) {
-      showToast("error", result.message || "Request could not be approved.");
-      return;
-    }
-
-    updateAdminRequest(request.id, "approved");
-    showToast("success", "Request approved and booking created successfully.");
   }
 
   function handleRejectRequest(request) {
-    updateAdminRequest(request.id, "rejected");
-    showToast("success", "Request rejected successfully.");
+    openModal({
+      type: "rejectRequest",
+      title: "Reject Booking Request",
+      message: `Reject this booking request for ${request.roomName}? This action will mark the request as rejected.`,
+      confirmText: "Yes, Reject",
+      tone: "red",
+      payload: request,
+    });
   }
 
   return (
@@ -1177,628 +1209,544 @@ function RequestsSection({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Users */
-/* -------------------------------------------------------------------------- */
-
-function UsersSection({ users, globalSearch, openModal }) {
-  const [roleFilter, setRoleFilter] = useState("all");
-
-  const filteredUsers = users
-    .filter((user) => {
-      const searchValue = globalSearch.toLowerCase();
-
-      const matchesSearch =
-        !searchValue ||
-        user.name?.toLowerCase().includes(searchValue) ||
-        user.email?.toLowerCase().includes(searchValue);
-
-      const matchesRole = roleFilter === "all" || user.role === roleFilter;
-
-      return matchesSearch && matchesRole;
-    })
-    .sort((a, b) => {
-      if (a.role === "admin" && b.role !== "admin") return -1;
-      if (a.role !== "admin" && b.role === "admin") return 1;
-      return a.name.localeCompare(b.name);
-    });
-
-  return (
-    <>
-      <SectionTitle
-        eyebrow="Users"
-        title="User Management"
-        description="View employees and manage access."
-      />
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <StatCard
-          title="Total Users"
-          value={users.length}
-          helper="All employees"
-          icon={<FaUsers />}
-          tone="blue"
-        />
-
-        <StatCard
-          title="Admins"
-          value={users.filter((user) => user.role === "admin").length}
-          helper="Admin access"
-          icon={<FaUser />}
-          tone="purple"
-        />
-
-        <StatCard
-          title="Employees"
-          value={users.filter((user) => user.role === "user").length}
-          helper="Normal users"
-          icon={<FaUsers />}
-          tone="green"
-        />
-      </div>
-
-      <Card>
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
-          <h3 className="text-lg font-bold text-slate-900">All Users</h3>
-
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="all">All Roles</option>
-            <option value="admin">Admins</option>
-            <option value="user">Users</option>
-          </select>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-slate-600">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Name</th>
-                <th className="px-4 py-3 font-semibold">Email</th>
-                <th className="px-4 py-3 font-semibold">Role</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-100">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold ${
-                          user.role === "admin"
-                            ? "bg-purple-100 text-purple-700"
-                            : "bg-blue-100 text-blue-700"
-                        }`}
-                      >
-                        {user.name?.charAt(0).toUpperCase()}
-                      </div>
-
-                      <span className="font-semibold text-slate-900">
-                        {user.name}
-                      </span>
-                    </div>
-                  </td>
-
-                  <td className="px-4 py-4 text-slate-600">{user.email}</td>
-
-                  <td className="px-4 py-4">
-                    <StatusBadge status={user.role} />
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <StatusBadge status={user.status || "active"} />
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openModal({
-                            type: "changeRole",
-                            title: "Change User Role",
-                            message:
-                              "Are you sure you want to change this user's role?",
-                            confirmText: "Change Role",
-                            tone: "blue",
-                            payload: user.id,
-                          })
-                        }
-                        className="admin-action-blue"
-                      >
-                        <FaUsers size={13} />
-                        Change Role
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() =>
-                          openModal({
-                            type: "toggleUser",
-                            title:
-                              user.status === "disabled"
-                                ? "Enable User"
-                                : "Disable User",
-                            message:
-                              user.status === "disabled"
-                                ? "Are you sure you want to enable this user?"
-                                : "Are you sure you want to disable this user?",
-                            confirmText:
-                              user.status === "disabled"
-                                ? "Enable User"
-                                : "Disable User",
-                            tone: "red",
-                            payload: user.id,
-                          })
-                        }
-                        className="admin-action-red"
-                      >
-                        <FaTimes size={13} />
-                        {user.status === "disabled" ? "Enable" : "Disable"}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-    </>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* Rooms */
 /* -------------------------------------------------------------------------- */
 
-function RoomsSection({ rooms, addRoom, updateRoom, openModal, showToast }) {
-  const [showRoomForm, setShowRoomForm] = useState(false);
+function RoomsSection({
+  rooms,
+  openModal,
+  addRoom,
+  updateRoom,
+  deleteRoom,
+  toggleRoomActive,
+  changeRoomStatus,
+}) {
+  const [showForm, setShowForm] = useState(false);
 
-  const [roomForm, setRoomForm] = useState({
+  const [editingRoom, setEditingRoom] = useState(null);
+
+  const emptyRoomForm = {
     name: "",
     location: "",
     capacity: "",
     description: "",
     amenities: "",
-  });
+    status: "available",
+    isActive: true,
+  };
+
+  const [roomForm, setRoomForm] = useState(emptyRoomForm);
 
   const activeRooms = rooms.filter((room) => room.isActive).length;
-  const inactiveRooms = rooms.filter((room) => !room.isActive).length;
+  const inactiveRooms = rooms.length - activeRooms;
 
-  function handleAddRoom() {
-    if (!roomForm.name.trim()) {
-      showToast("error", "Room name is required.");
-      return;
-    }
+  const openAddRoomForm = () => {
+    setEditingRoom(null);
+    setRoomForm(emptyRoomForm);
+    setShowForm(true);
+  };
 
-    if (!roomForm.location.trim()) {
-      showToast("error", "Room location is required.");
-      return;
-    }
-
-    if (!roomForm.capacity || Number(roomForm.capacity) <= 0) {
-      showToast("error", "Please enter a valid room capacity.");
-      return;
-    }
-
-    addRoom({
-      name: roomForm.name,
-      location: roomForm.location,
-      capacity: Number(roomForm.capacity),
-      description: roomForm.description,
-      amenities: roomForm.amenities
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean),
-      status: "available",
-      isActive: true,
-    });
-
-    showToast("success", "Room added successfully.");
+  const openEditRoomForm = (room) => {
+    setEditingRoom(room);
 
     setRoomForm({
-      name: "",
-      location: "",
-      capacity: "",
-      description: "",
-      amenities: "",
+      name: room.name || "",
+      location: room.location || "",
+      capacity: room.capacity || "",
+      description: room.description || "",
+      amenities: Array.isArray(room.amenities)
+        ? room.amenities.join(", ")
+        : room.amenities || "",
+      status: room.status || "available",
+      isActive: room.isActive ?? true,
     });
 
-    setShowRoomForm(false);
-  }
+    setShowForm(true);
+  };
+
+  const closeRoomForm = () => {
+    setShowForm(false);
+    setEditingRoom(null);
+    setRoomForm(emptyRoomForm);
+  };
+
+  const handleRoomFormChange = (event) => {
+    const { name, value } = event.target;
+
+    setRoomForm((previousForm) => ({
+      ...previousForm,
+      [name]: value,
+    }));
+  };
+
+  const handleRoomSubmit = (event) => {
+    event.preventDefault();
+
+    const formattedRoom = {
+      ...roomForm,
+      capacity: Number(roomForm.capacity),
+      amenities: roomForm.amenities
+        .split(",")
+        .map((amenity) => amenity.trim())
+        .filter(Boolean),
+      isActive: roomForm.isActive === true || roomForm.isActive === "true",
+    };
+
+    if (editingRoom) {
+      updateRoom(editingRoom.id, formattedRoom);
+    } else {
+      addRoom(formattedRoom);
+    }
+
+    closeRoomForm();
+  };
 
   return (
-    <>
-      <SectionTitle
+    <section className="space-y-5">
+      <SectionHeader
         eyebrow="Rooms"
         title="Room Management"
         description="Add rooms, update details, and control room availability."
       />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <StatCard
-          title="Total Rooms"
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <SummaryCard
+          icon={<FaDoorOpen />}
+          label="Total Rooms"
           value={rooms.length}
-          helper="All rooms"
-          icon={<FaBuilding />}
+          helper="All meeting rooms"
           tone="blue"
         />
 
-        <StatCard
-          title="Active"
-          value={activeRooms}
-          helper="Visible to users"
+        <SummaryCard
           icon={<FaCheckCircle />}
+          label="Active"
+          value={activeRooms}
+          helper="Visible to employees"
           tone="green"
         />
 
-        <StatCard
-          title="Inactive"
-          value={inactiveRooms}
-          helper="Hidden rooms"
+        <SummaryCard
           icon={<FaTimesCircle />}
+          label="Inactive"
+          value={inactiveRooms}
+          helper="Hidden from booking"
           tone="red"
         />
       </div>
 
-      <Card>
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between px-5 py-4 border-b border-slate-100">
           <div>
             <h3 className="text-lg font-bold text-slate-900">Rooms</h3>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="text-sm text-slate-500 mt-1">
               Manage meeting rooms used by employees.
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => setShowRoomForm((previous) => !previous)}
-            className="admin-action-blue"
+            onClick={showForm ? closeRoomForm : openAddRoomForm}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             <FaPlus size={13} />
-            {showRoomForm ? "Close Form" : "Add Room"}
+            {showForm ? "Close Form" : "Add Room"}
           </button>
         </div>
 
-        {showRoomForm && (
-          <div className="border-b border-slate-100 p-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label="Room Name">
+        {showForm && (
+          <form
+            onSubmit={handleRoomSubmit}
+            className="border-b border-slate-100 bg-slate-50/70 px-5 py-5"
+          >
+            <div className="mb-4">
+              <h4 className="text-base font-bold text-slate-900">
+                {editingRoom ? "Edit Room Details" : "Add New Room"}
+              </h4>
+              <p className="text-sm text-slate-500 mt-1">
+                Fill room details carefully. These details will be visible to
+                employees.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Room Name
+                </label>
                 <input
                   type="text"
+                  name="name"
                   value={roomForm.name}
-                  onChange={(event) =>
-                    setRoomForm((previous) => ({
-                      ...previous,
-                      name: event.target.value,
-                    }))
-                  }
+                  onChange={handleRoomFormChange}
+                  required
                   placeholder="Conference Room A"
-                  className="admin-input"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
-              </Field>
+              </div>
 
-              <Field label="Location">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Location
+                </label>
                 <input
                   type="text"
+                  name="location"
                   value={roomForm.location}
-                  onChange={(event) =>
-                    setRoomForm((previous) => ({
-                      ...previous,
-                      location: event.target.value,
-                    }))
-                  }
+                  onChange={handleRoomFormChange}
+                  required
                   placeholder="First Floor"
-                  className="admin-input"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
-              </Field>
+              </div>
 
-              <Field label="Capacity">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Capacity
+                </label>
                 <input
                   type="number"
+                  name="capacity"
                   value={roomForm.capacity}
-                  onChange={(event) =>
-                    setRoomForm((previous) => ({
-                      ...previous,
-                      capacity: event.target.value,
-                    }))
-                  }
+                  onChange={handleRoomFormChange}
+                  required
+                  min="1"
                   placeholder="10"
-                  className="admin-input"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
-              </Field>
+              </div>
 
-              <Field label="Amenities">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Status
+                </label>
+                <select
+                  name="status"
+                  value={roomForm.status}
+                  onChange={handleRoomFormChange}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="available">Available</option>
+                  <option value="unavailable">Unavailable</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Description
+                </label>
                 <input
                   type="text"
-                  value={roomForm.amenities}
-                  onChange={(event) =>
-                    setRoomForm((previous) => ({
-                      ...previous,
-                      amenities: event.target.value,
-                    }))
-                  }
-                  placeholder="Projector, Wi-Fi, Whiteboard"
-                  className="admin-input"
-                />
-              </Field>
-
-              <Field label="Description">
-                <textarea
+                  name="description"
                   value={roomForm.description}
-                  onChange={(event) =>
-                    setRoomForm((previous) => ({
-                      ...previous,
-                      description: event.target.value,
-                    }))
-                  }
-                  placeholder="Short room description"
-                  className="admin-input min-h-[80px] resize-none py-3"
+                  onChange={handleRoomFormChange}
+                  placeholder="Best for client calls and team meetings"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
-              </Field>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Amenities
+                </label>
+                <input
+                  type="text"
+                  name="amenities"
+                  value={roomForm.amenities}
+                  onChange={handleRoomFormChange}
+                  placeholder="Projector, Whiteboard, Wi-Fi"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
             </div>
+
+            <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeRoomForm}
+                className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 border border-slate-200 transition hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="submit"
+                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                {editingRoom ? "Update Room" : "Save Room"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {rooms.length === 0 ? (
+          <div className="px-5 py-14 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-blue-600">
+              <FaDoorOpen size={22} />
+            </div>
+
+            <h3 className="text-base font-bold text-slate-900">
+              No rooms added yet
+            </h3>
+
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+              Start by adding meeting rooms so employees can view and book
+              available spaces.
+            </p>
 
             <button
               type="button"
-              onClick={handleAddRoom}
-              className="mt-4 flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
+              onClick={openAddRoomForm}
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
               <FaPlus size={13} />
-              Save Room
+              Add First Room
             </button>
           </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {rooms.map((room) => (
+              <RoomManagementCard
+                key={room.id}
+                room={room}
+                onEdit={openEditRoomForm}
+                openModal={openModal}
+                deleteRoom={deleteRoom}
+                toggleRoomActive={toggleRoomActive}
+                changeRoomStatus={changeRoomStatus}
+              />
+            ))}
+          </div>
         )}
-
-        <div className="divide-y divide-slate-100">
-          {rooms.map((room) => (
-            <div
-              key={room.id}
-              className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between"
-            >
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-bold text-slate-900">
-                    {room.name}
-                  </h3>
-
-                  <StatusBadge status={room.status} />
-                  <StatusBadge status={room.isActive ? "active" : "inactive"} />
-                </div>
-
-                <div className="mt-2 flex flex-wrap gap-4 text-sm text-slate-600">
-                  <span>{room.location}</span>
-                  <span>{room.capacity} people</span>
-                </div>
-
-                <p className="mt-2 max-w-xl text-sm text-slate-500">
-                  {room.description || "No description added."}
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {room.amenities?.length > 0 ? (
-                    room.amenities.map((amenity) => (
-                      <span
-                        key={amenity}
-                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
-                      >
-                        {amenity}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-400">
-                      No amenities added
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    openModal({
-                      type: "toggleRoom",
-                      title: room.isActive ? "Deactivate Room" : "Activate Room",
-                      message: room.isActive
-                        ? "This room will be hidden from users. Continue?"
-                        : "This room will be visible to users. Continue?",
-                      confirmText: room.isActive ? "Deactivate" : "Activate",
-                      tone: "blue",
-                      payload: room.id,
-                    })
-                  }
-                  className="admin-action-amber"
-                >
-                  {room.isActive ? "Deactivate" : "Activate"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    updateRoom(room.id, {
-                      ...room,
-                      status:
-                        room.status === "available"
-                          ? "unavailable"
-                          : "available",
-                    })
-                  }
-                  className="admin-action-blue"
-                >
-                  <FaEdit size={13} />
-                  Change Status
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    openModal({
-                      type: "deleteRoom",
-                      title: "Delete Room",
-                      message:
-                        "Are you sure you want to delete this room? This action cannot be undone.",
-                      confirmText: "Delete Room",
-                      tone: "red",
-                      payload: room.id,
-                    })
-                  }
-                  className="admin-action-red"
-                >
-                  <FaTrash size={13} />
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </>
+      </div>
+    </section>
   );
 }
+function SectionHeader({ eyebrow, title, description }) {
+  return (
+    <div>
+      {eyebrow && (
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
+          {eyebrow}
+        </p>
+      )}
 
-/* -------------------------------------------------------------------------- */
-/* Reports */
-/* -------------------------------------------------------------------------- */
+      <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+        {title}
+      </h2>
 
-function ReportsSection({ bookings, rooms, users }) {
-  const [duration, setDuration] = useState("all");
+      {description && (
+        <p className="mt-2 text-sm leading-6 text-slate-500">
+          {description}
+        </p>
+      )}
+    </div>
+  );
+}
+function SummaryCard({ icon, label, value, helper, tone = "blue" }) {
+  const toneClasses = {
+    blue: {
+      iconBox: "bg-blue-50 text-blue-600",
+    },
+    green: {
+      iconBox: "bg-green-50 text-green-600",
+    },
+    red: {
+      iconBox: "bg-red-50 text-red-600",
+    },
+    amber: {
+      iconBox: "bg-amber-50 text-amber-600",
+    },
+    purple: {
+      iconBox: "bg-purple-50 text-purple-600",
+    },
+    slate: {
+      iconBox: "bg-slate-100 text-slate-600",
+    },
+  };
 
-  const reportCards = [
-    {
-      title: "Excel Report",
-      description: "Export booking records in spreadsheet format.",
-      icon: <FaFileExcel />,
-      button: "Export Excel",
-      tone: "green",
-    },
-    {
-      title: "PDF Report",
-      description: "Download a printable booking summary.",
-      icon: <FaFilePdf />,
-      button: "Export PDF",
-      tone: "slate",
-    },
-    {
-      title: "CSV Report",
-      description: "Export booking data for analysis tools.",
-      icon: <FaFileCsv />,
-      button: "Export CSV",
-      tone: "blue",
-    },
-  ];
+  const selectedTone = toneClasses[tone] || toneClasses.blue;
 
   return (
-    <>
-      <SectionTitle
-        eyebrow="Reports"
-        title="Reports & Exports"
-        description="Download booking reports for office tracking."
-      />
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
+      <div className="flex items-center gap-4">
+        <div
+          className={`flex h-12 w-12 items-center justify-center rounded-2xl text-lg ${selectedTone.iconBox}`}
+        >
+          {icon}
+        </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <StatCard
-          title="Bookings"
-          value={bookings.length}
-          helper="Total records"
-          icon={<FaCalendarAlt />}
-          tone="blue"
-        />
+        <div>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
 
-        <StatCard
-          title="Rooms"
-          value={rooms.length}
-          helper="Office rooms"
-          icon={<FaBuilding />}
-          tone="green"
-        />
+          <p className="mt-1 text-3xl font-bold leading-none text-slate-900">
+            {value}
+          </p>
 
-        <StatCard
-          title="Users"
-          value={users.length}
-          helper="Employees"
-          icon={<FaUsers />}
-          tone="purple"
-        />
-      </div>
-
-      <Card>
-        <CardHeader
-          title="Export Reports"
-          description="Select duration and choose export format."
-        />
-
-        <div className="grid grid-cols-1 gap-4 p-4 lg:grid-cols-[360px_1fr]">
-          <Field label="Duration">
-            <select
-              value={duration}
-              onChange={(event) => setDuration(event.target.value)}
-              className="admin-input"
-            >
-              <option value="all">All Bookings</option>
-              <option value="today">Today</option>
-              <option value="month">This Month</option>
-              <option value="sixMonths">Last 6 Months</option>
-              <option value="year">This Year</option>
-            </select>
-          </Field>
-
-          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
-            <h4 className="text-sm font-bold text-blue-700">Ready to export</h4>
-            <p className="mt-1 text-sm text-blue-600">
-              {bookings.length} booking records are available for export.
+          {helper && (
+            <p className="mt-1 text-xs font-medium text-slate-400">
+              {helper}
             </p>
-          </div>
+          )}
         </div>
-
-        <div className="grid grid-cols-1 gap-4 border-t border-slate-100 p-4 md:grid-cols-3">
-          {reportCards.map((card) => (
-            <div
-              key={card.title}
-              className="rounded-2xl border border-slate-200 bg-white p-4"
-            >
-              <div
-                className={`mb-3 flex h-10 w-10 items-center justify-center rounded-xl ${getToneClass(
-                  card.tone
-                ).soft} ${getToneClass(card.tone).text}`}
-              >
-                {card.icon}
-              </div>
-
-              <h3 className="text-base font-bold text-slate-900">
-                {card.title}
-              </h3>
-
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                {card.description}
-              </p>
-
-              <button
-                type="button"
-                className={`mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition ${
-                  card.tone === "green"
-                    ? "bg-green-50 text-green-700 hover:bg-green-100"
-                    : card.tone === "blue"
-                    ? "bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {card.icon}
-                {card.button}
-              </button>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </>
+      </div>
+    </div>
   );
 }
 
+function RoomManagementCard({
+  room,
+  onEdit,
+  openModal,
+  deleteRoom,
+  toggleRoomActive,
+  changeRoomStatus,
+}) {
+  const isAvailable = room.status === "available";
+  const isActive = room.isActive;
+
+  const amenities = Array.isArray(room.amenities) ? room.amenities : [];
+
+  return (
+    <div className="px-5 py-5 transition hover:bg-slate-50/70">
+      <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="text-base font-bold text-slate-900">
+              {room.name}
+            </h4>
+
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                isAvailable
+                  ? "bg-green-50 text-green-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              {isAvailable ? "Available" : "Unavailable"}
+            </span>
+
+            <span
+              className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ${
+                isActive
+                  ? "bg-blue-50 text-blue-700"
+                  : "bg-red-50 text-red-700"
+              }`}
+            >
+              {isActive ? "Active" : "Inactive"}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-500">
+            <span className="inline-flex items-center gap-2">
+              <FaMapMarkerAlt className="text-slate-400" size={13} />
+              {room.location || "No location"}
+            </span>
+
+            <span className="inline-flex items-center gap-2">
+              <FaUsers className="text-slate-400" size={13} />
+              {room.capacity || 0} people
+            </span>
+          </div>
+
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+            {room.description || "No description added for this room."}
+          </p>
+
+          {amenities.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {amenities.map((amenity) => (
+                <span
+                  key={amenity}
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600"
+                >
+                  {amenity}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 xl:justify-end">
+          <button
+            type="button"
+            onClick={() => onEdit(room)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+          >
+            <FaEdit size={13} />
+            Edit
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              openModal({
+                type: "toggleRoomActive",
+                payload: room.id,
+                title: isActive ? "Deactivate Room" : "Activate Room",
+                message: isActive
+                  ? `Are you sure you want to deactivate ${room.name}? Employees will not be able to book this room.`
+                  : `Are you sure you want to activate ${room.name}? Employees will be able to book this room.`,
+                confirmText: isActive ? "Yes, Deactivate" : "Yes, Activate",
+                tone: isActive ? "amber" : "green",
+              })
+            }
+            className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+              isActive
+                ? "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                : "bg-green-50 text-green-700 hover:bg-green-100"
+            }`}
+          >
+            <FaPowerOff size={13} />
+            {isActive ? "Deactivate" : "Activate"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              openModal({
+                type: "changeRoomStatus",
+                payload: room.id,
+                title: "Change Room Status",
+                message: isAvailable
+                  ? "Mark this room as unavailable? Employees will not be able to book it until it is available again."
+                  : "Mark this room as available? Employees will be able to book it again.",
+                confirmText: isAvailable
+                  ? "Yes, Mark Unavailable"
+                  : "Yes, Mark Available",
+                tone: "blue",
+              })
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+          >
+            <FaEdit size={13} />
+            Status
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              openModal({
+                type: "deleteRoom",
+                payload: room.id,
+                title: "Delete Room",
+                message: `Are you sure you want to delete ${room.name}? This action cannot be undone.`,
+                confirmText: "Yes, Delete",
+                tone: "red",
+              })
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+          >
+            <FaTrash size={13} />
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+/* -------------------------------------------------------------------------- */
+/* Reports */
 /* -------------------------------------------------------------------------- */
 /* Reusable UI */
 /* -------------------------------------------------------------------------- */
@@ -2111,7 +2059,7 @@ function BookingTable({
                         title: "Cancel Booking",
                         message:
                           "Are you sure you want to cancel this booking?",
-                        confirmText: "Cancel Booking",
+                        confirmText: "Yes, Cancel",
                         tone: "red",
                         payload: booking.id,
                       })
@@ -2205,56 +2153,23 @@ function EmptyState({ title }) {
   );
 }
 
-function ProfessionalModal({
-  open,
-  title,
-  message,
-  confirmText,
-  tone,
-  onClose,
-  onConfirm,
-}) {
-  if (!open) return null;
+
+function Toast({ type = "success", message }) {
+  const isError = type === "error";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl">
-        <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+    <div className="fixed left-1/2 top-20 z-[9999] w-[calc(100%-32px)] max-w-sm -translate-x-1/2 sm:left-auto sm:right-6 sm:top-24 sm:w-auto sm:max-w-md sm:translate-x-0">
+      <div
+        className={`flex items-start gap-3 rounded-2xl px-4 py-3 text-sm font-semibold text-white shadow-lg ring-1 ring-black/5 ${
+          isError ? "bg-red-600" : "bg-green-600"
+        }`}
+      >
+        <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/20 text-xs">
+          {isError ? "!" : "✓"}
+        </span>
 
-        <p className="mt-2 text-sm leading-6 text-slate-500">{message}</p>
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="admin-action-slate"
-          >
-            Close
-          </button>
-
-          <button
-            type="button"
-            onClick={onConfirm}
-            className={tone === "red" ? "admin-action-red" : "admin-action-blue"}
-          >
-            {confirmText}
-          </button>
-        </div>
+        <p className="leading-5 break-words">{message}</p>
       </div>
-    </div>
-  );
-}
-
-function Toast({ type, message }) {
-  return (
-    <div
-      className={`fixed right-5 top-24 z-50 rounded-xl px-4 py-3 text-sm font-semibold shadow-lg ${
-        type === "success"
-          ? "bg-green-600 text-white"
-          : "bg-red-600 text-white"
-      }`}
-    >
-      {message}
     </div>
   );
 }

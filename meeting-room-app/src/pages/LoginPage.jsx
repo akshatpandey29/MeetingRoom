@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   FaEnvelope, FaLock, FaUser,
-  FaEye, FaEyeSlash, FaGoogle, FaCheckCircle,
+  FaEye, FaEyeSlash, FaCheckCircle,
 } from 'react-icons/fa';
 import { MdMeetingRoom } from 'react-icons/md';
 
@@ -227,7 +227,7 @@ function LoginPage() {
   errs.password = 'Add at least one lowercase letter (e.g. a, b, c)';
 } else if (!/[0-9]/.test(regData.password)) {
   errs.password = 'Add at least one number (e.g. 1, 2, 3)';
-} else if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(regData.password)) {
+} else if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(regData.password)) {
   errs.password = 'Add at least one special character (e.g. @, #, $, !)';
 }
     return errs;
