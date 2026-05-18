@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -47,7 +48,8 @@ function ToastContainer({ toasts }) {
 }
 
 // ── Field ────────────────────────────────────────────────────────────────────
-function Field({ icon, label, error, children }) {
+function Field({ icon, label, error, hasError, children }) {
+  const showBorder = error || hasError;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
       <label style={{
@@ -58,16 +60,19 @@ function Field({ icon, label, error, children }) {
       </label>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
-        border: error ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
+        border: showBorder ? '1.5px solid #ef4444' : '1.5px solid #e2e8f0',
         borderRadius: 10, padding: '11px 13px',
-        background: '#f8fafc', transition: 'border-color 0.15s',
+        background: showBorder ? '#fff5f5' : '#f8fafc',
+        transition: 'border-color 0.15s',
       }}>
-        <span style={{ color: '#94a3b8', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+        <span style={{ color: showBorder ? '#ef4444' : '#94a3b8', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
           {icon}
         </span>
         {children}
       </div>
-      {error && <p style={{ fontSize: 12, color: '#ef4444', margin: 0 }}>{error}</p>}
+      {error && error.trim() && (
+        <p style={{ fontSize: 12, color: '#ef4444', margin: 0 }}>{error}</p>
+      )}
     </div>
   );
 }
@@ -241,21 +246,21 @@ function LoginPage() {
   try {
     setLoading(true);
     const result = await login(loginData);
-    if (result.success) {
-      // keep spinner running, show toast, then navigate
-      showToast(`Welcome back, ${result.user.name}! 👋`, 'success');
-      setTimeout(() => {
-        navigate(result.user.role === 'admin' ? '/admin' : '/rooms');
-      }, 1500);
-      // do NOT setLoading(false) on success — spinner stays until navigation
-    } else {
-      showToast(result.message || 'Login failed', 'error');
-      setLoading(false);
-    }
+   if (result.success) {
+  showToast(`Welcome back, ${result.user.name}! 👋`, 'success');
+  setTimeout(() => navigate(result.user.role === 'admin' ? '/admin' : '/rooms'), 1500);
+}else {
+  showToast(result.message || 'Login failed', 'error');
+  setLoginErrors({ 
+    email: 'Invalid email or password', 
+    password: 'Invalid email or password' 
+  });
+}
   } catch {
-    showToast('Something went wrong', 'error');
-    setLoading(false);
-  }
+  showToast('Something went wrong', 'error');
+  setLoginErrors({ email: 'Invalid email or password', password: 'Invalid email or password' });
+  setLoading(false);
+}
 };
 
   const handleRegisterSubmit = async (e) => {
@@ -332,24 +337,24 @@ function LoginPage() {
               </div>
 
               <form onSubmit={handleLoginSubmit}>
-                <Field icon={<FaEnvelope size={13} />} label="Email address" error={loginErrors.email}>
+                <Field icon={<FaEnvelope size={13} />} label="Email address" error={loginErrors.email} hasError={!!loginErrors.email}>
                   <input
                     type="email" 
                     required
                     placeholder="you@company.com"
                     value={loginData.email}
-                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                    onChange={(e) => { setLoginData({ ...loginData, email: e.target.value }); setLoginErrors({}); }}
                     style={inputStyle}
                   />
                 </Field>
 
-                <Field icon={<FaLock size={13} />} label="Password" error={loginErrors.password}>
+                <Field icon={<FaLock size={13} />} label="Password" error={loginErrors.password} hasError={!!loginErrors.password}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
                     value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    onChange={(e) => { setLoginData({ ...loginData, password: e.target.value }); setLoginErrors({}); }}
                     style={inputStyle}
                   />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
@@ -359,9 +364,9 @@ function LoginPage() {
                 </Field>
 
                 <div style={{ textAlign: 'right', marginTop: -8, marginBottom: 18 }}>
-                  <span style={{ fontSize: 13, color: '#2563eb', cursor: 'pointer', fontWeight: 500 }}>
-                    Forgot password?
-                  </span>
+                 <Link to="/forgot-password" style={{ fontSize: 13, color: '#2563eb', fontWeight: 500, textDecoration: 'none' }}>
+  Forgot password?
+</Link>
                 </div>
 
                 <button

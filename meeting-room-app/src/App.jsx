@@ -9,12 +9,17 @@ import MyBookingsPage from './pages/MyBookingsPage';
 import ProfilePage from './pages/ProfilePage';
 import CalendarPage from './pages/CalendarPage';
 import { RoomProvider } from './context/RoomContext';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+
 
 function App() {
   return (
     <RoomProvider>
       <BrowserRouter>
         <Routes>
+
+
 
           {/* Public route */}
           <Route path="/" element={<LoginPage />} />
@@ -76,6 +81,9 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         </Routes>
       </BrowserRouter>

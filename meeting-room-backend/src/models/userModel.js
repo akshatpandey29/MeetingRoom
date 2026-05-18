@@ -4,6 +4,8 @@ const { ROLES } = require('../utils/constants');
 
 const userSchema = new mongoose.Schema(
   {
+    passwordResetToken: { type: String, default: null },
+passwordResetExpires: { type: Date, default: null },
     name: {
       type: String,
       required: [true, 'Name is required'],
