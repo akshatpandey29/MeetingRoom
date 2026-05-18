@@ -210,6 +210,7 @@ export const AuthProvider = ({ children }) => {
     admins,
     normalUsers,
     loading,
+    usersLoading,
     login,
     register,
     logout,

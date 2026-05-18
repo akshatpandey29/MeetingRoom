@@ -86,7 +86,7 @@ function UserManagement() {
     });
   };
 
-  const handleConfirmModalAction = () => {
+  const handleConfirmModalAction = async () => {
     const selectedActionUser = modalData.payload;
 
     if (!selectedActionUser) {
@@ -95,7 +95,7 @@ function UserManagement() {
     }
 
     if (modalData.actionType === "changeRole") {
-      const result = changeUserRole(selectedActionUser.id);
+      const result = await changeUserRole(selectedActionUser.id);
 
       showMessage(
         result.message ||
@@ -108,7 +108,7 @@ function UserManagement() {
     }
 
     if (modalData.actionType === "toggleStatus") {
-      const result = toggleUserStatus(selectedActionUser.id);
+      const result = await toggleUserStatus(selectedActionUser.id);
 
       showMessage(
         result.message ||

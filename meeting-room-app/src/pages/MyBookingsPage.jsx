@@ -106,11 +106,14 @@ function MyBookingsPage() {
     setModalOpen(true);
   };
 
-  const handleConfirmCancel = () => {
-    cancelBooking(selectedBookingId);
+  const handleConfirmCancel = async () => {
+    const result = await cancelBooking(selectedBookingId);
     setModalOpen(false);
     setSelectedBookingId(null);
-    setMessage({ text: 'Booking cancelled successfully.', type: 'success' });
+    setMessage({
+      text: result.message || 'Booking cancelled successfully.',
+      type: result.success ? 'success' : 'error',
+    });
   };
 
   const handleReschedule = (booking) => {

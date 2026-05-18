@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import {
   FaTimes, FaClock, FaCalendarAlt, FaCheckCircle, FaBell,
@@ -80,7 +79,7 @@ const formatTime24 = (time) => time || '';
   // ─── Conflict check ───────────────────────────────
   const hasTimeConflict = (start, end) => {
     if (!selectedRoom || !dateStr) return false;
-    const existing = getBookingsByRoomAndDate(Number(selectedRoom), dateStr);
+    const existing = getBookingsByRoomAndDate(selectedRoom, dateStr);
     return existing.some((booking) => {
       if (prefilledBooking && booking.id === prefilledBooking.id) return false;
       const bStart = new Date(`${dateStr} ${booking.startTime}`);
@@ -92,7 +91,7 @@ const formatTime24 = (time) => time || '';
   };
 
   // ─── Book / Reschedule ────────────────────────────
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!selectedRoom) {
       setMessage({ text: 'Please select a room.', type: 'error' });
       return;
@@ -145,10 +144,10 @@ if (dateStr === todayStr && startTime) {
 
     setLoading(true);
     const slot = `${formatTime(startTime)} - ${formatTime(endTime)}`;
-    const roomObj = rooms.find((r) => r.id === Number(selectedRoom));
+    const roomObj = rooms.find((r) => String(r.id) === String(selectedRoom));
 
     if (mode === 'reschedule' && prefilledBooking) {
-      const result = rescheduleBooking({
+      const result = await rescheduleBooking({
         bookingId: prefilledBooking.id,
         newDate: dateStr,
         newSlot: slot,
@@ -168,8 +167,8 @@ if (dateStr === todayStr && startTime) {
         setMessage({ text: result.message, type: 'error' });
       }
     } else {
-      const result = bookSlot({
-        roomId: Number(selectedRoom),
+      const result = await bookSlot({
+        roomId: selectedRoom,
         roomName: roomObj?.name || '',
         date: dateStr,
         slot,
@@ -194,7 +193,7 @@ if (dateStr === todayStr && startTime) {
   };
 
   // ─── Admin Request ────────────────────────────────
-  const handleAdminRequest = () => {
+  const handleAdminRequest = async () => {
     if (!selectedRoom) {
       setMessage({ text: 'Please select a room first.', type: 'error' });
       return;
@@ -205,10 +204,10 @@ if (dateStr === todayStr && startTime) {
     }
 
     const slot = `${formatTime(startTime)} - ${formatTime(endTime)}`;
-    const roomObj = rooms.find((r) => r.id === Number(selectedRoom));
+    const roomObj = rooms.find((r) => String(r.id) === String(selectedRoom));
 
-    const result = addAdminRequest({
-      roomId: Number(selectedRoom),
+    const result = await addAdminRequest({
+      roomId: selectedRoom,
       roomName: roomObj?.name || '',
       date: dateStr,
       slot,
