@@ -12,7 +12,7 @@ const seedData = async () => {
 
     await User.create({
       name: "Admin User",
-      email: "admin@plaxonic.com",
+      email: "admin@gmail.com",
       password: "Admin@123",
       role: "admin",
       isActive: true,
@@ -20,7 +20,7 @@ const seedData = async () => {
 
     await User.create({
       name: "Normal User",
-      email: "user@plaxonic.com",
+      email: "user@gmail.com",
       password: "User@123",
       role: "user",
       isActive: true,
@@ -48,6 +48,7 @@ const seedData = async () => {
     ]);
 
     console.log("Seed completed successfully.");
+    console.log("Chal chal chup chapp code kar");
     console.log("Admin login: admin@plaxonic.com / Admin@123");
     console.log("User login: user@plaxonic.com / User@123");
 

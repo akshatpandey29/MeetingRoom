@@ -1,5 +1,10 @@
-const { Booking, Room, User } = require("../models");
-const { BOOKING_STATUS, ROOM_STATUS } = require("../utils/constants");
+const { Booking, Room, User, AdminRequest } = require("../models");
+const {
+  ADMIN_REQUEST_STATUS,
+  BOOKING_STATUS,
+  ROOM_STATUS,
+  ROLES,
+} = require("../utils/constants");
 
 const convertTimeToMinutes = (time) => {
   const [hours, minutes] = time.split(":").map(Number);
@@ -16,6 +21,7 @@ const hasTimeConflict = (existingStart, existingEnd, newStart, newEnd) => {
 };
 
 const createBooking = async ({
+  currentUser,
   userId,
   roomId,
   date,
@@ -39,7 +45,10 @@ const createBooking = async ({
     };
   }
 
-  const user = await User.findById(userId);
+  const bookingUserId =
+    currentUser?.role === ROLES.ADMIN && userId ? userId : currentUser?._id || userId;
+
+  const user = await User.findById(bookingUserId);
 
   if (!user || !user.isActive) {
     return {
@@ -91,7 +100,7 @@ const createBooking = async ({
   }
 
   const booking = await Booking.create({
-    userId,
+    userId: bookingUserId,
     roomId,
     date,
     startTime,
@@ -103,11 +112,80 @@ const createBooking = async ({
     status: BOOKING_STATUS.CONFIRMED,
   });
 
+  await booking.populate("userId", "name email role");
+  await booking.populate("roomId", "name location capacity status isActive");
+
   return {
     success: true,
     statusCode: 201,
     message: "Booking created successfully.",
     data: { booking },
+  };
+};
+
+const createAdminRequest = async ({
+  userId,
+  roomId,
+  date,
+  startTime,
+  endTime,
+}) => {
+  if (!roomId || !date || !startTime || !endTime) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Room, date, start time, and end time are required.",
+    };
+  }
+
+  if (convertTimeToMinutes(endTime) <= convertTimeToMinutes(startTime)) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "End time must be after start time.",
+    };
+  }
+
+  const user = await User.findById(userId);
+
+  if (!user || !user.isActive) {
+    return {
+      success: false,
+      statusCode: 401,
+      message: "User not found or inactive.",
+    };
+  }
+
+  const room = await Room.findById(roomId);
+
+  if (!room) {
+    return {
+      success: false,
+      statusCode: 404,
+      message: "Meeting room not found.",
+    };
+  }
+
+  const request = await AdminRequest.create({
+    userId,
+    roomId,
+    date,
+    startTime,
+    endTime,
+    slot: `${startTime} - ${endTime}`,
+    requestedBy: user.name,
+    userEmail: user.email,
+    status: ADMIN_REQUEST_STATUS.PENDING,
+  });
+
+  await request.populate("userId", "name email role");
+  await request.populate("roomId", "name location capacity status isActive");
+
+  return {
+    success: true,
+    statusCode: 201,
+    message: "Booking request sent to admin.",
+    data: { request },
   };
 };
 
@@ -182,10 +260,31 @@ const cancelBooking = async ({
 
   await booking.save();
 
+  await booking.populate("userId", "name email role");
+  await booking.populate("roomId", "name location capacity status isActive");
+
   return {
     success: true,
     message: "Booking cancelled successfully.",
     data: { booking },
+  };
+};
+
+const deleteBookingFromDatabase = async ({ bookingId }) => {
+  const booking = await Booking.findByIdAndDelete(bookingId);
+
+  if (!booking) {
+    return {
+      success: false,
+      statusCode: 404,
+      message: "Booking not found.",
+    };
+  }
+
+  return {
+    success: true,
+    message: "Booking deleted from database successfully.",
+    data: { bookingId },
   };
 };
 
@@ -290,6 +389,9 @@ const rescheduleBooking = async ({
 
   await booking.save();
 
+  await booking.populate("userId", "name email role");
+  await booking.populate("roomId", "name location capacity status isActive");
+
   return {
     success: true,
     message: "Booking rescheduled successfully.",
@@ -384,9 +486,11 @@ const getAvailableSlots = async ({ roomId, date, slots = [] }) => {
 
 module.exports = {
   createBooking,
+  createAdminRequest,
   getAllBookings,
   getUserBookings,
   cancelBooking,
+  deleteBookingFromDatabase,
   rescheduleBooking,
   getBookingsByRoomAndDate,
   getAvailableSlots,

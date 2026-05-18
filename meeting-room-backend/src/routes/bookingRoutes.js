@@ -90,6 +90,15 @@ router.post(
   bookingController.createBooking
 );
 
+// Create admin approval request
+// POST /api/bookings/requests
+router.post(
+  "/requests",
+  authenticate,
+  createBookingValidation,
+  bookingController.createAdminRequest
+);
+
 // Get logged-in user's bookings
 // GET /api/bookings/my
 router.get(
@@ -132,6 +141,15 @@ router.delete(
   authenticate,
   cancelBookingValidation,
   bookingController.cancelBooking
+);
+
+// Permanently delete booking from database - admin only
+// DELETE /api/bookings/:id/permanent
+router.delete(
+  "/:id/permanent",
+  authenticate,
+  adminOnly,
+  bookingController.deleteBookingFromDatabase
 );
 
 // Reschedule booking

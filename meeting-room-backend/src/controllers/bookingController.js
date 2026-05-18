@@ -5,8 +5,25 @@ const { ROLES } = require("../utils/constants");
 const createBooking = async (req, res, next) => {
   try {
     const result = await bookingService.createBooking({
-      userId: req.user._id,
       ...req.body,
+      currentUser: req.user,
+    });
+
+    if (!result.success) {
+      return ApiResponse.error(res, result.message, result.statusCode || 400);
+    }
+
+    return ApiResponse.created(res, result.data, result.message);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const createAdminRequest = async (req, res, next) => {
+  try {
+    const result = await bookingService.createAdminRequest({
+      ...req.body,
+      userId: req.user._id,
     });
 
     if (!result.success) {
@@ -46,6 +63,22 @@ const cancelBooking = async (req, res, next) => {
       userId: req.user._id,
       isAdmin: req.user.role === ROLES.ADMIN,
       reason: req.body.reason,
+    });
+
+    if (!result.success) {
+      return ApiResponse.error(res, result.message, result.statusCode || 400);
+    }
+
+    return ApiResponse.success(res, result.data, result.message);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const deleteBookingFromDatabase = async (req, res, next) => {
+  try {
+    const result = await bookingService.deleteBookingFromDatabase({
+      bookingId: req.params.id,
     });
 
     if (!result.success) {
@@ -123,9 +156,11 @@ const getAvailableSlots = async (req, res, next) => {
 
 module.exports = {
   createBooking,
+  createAdminRequest,
   getAllBookings,
   getMyBookings,
   cancelBooking,
+  deleteBookingFromDatabase,
   rescheduleBooking,
   getBookingsByRoomAndDate,
   getAvailableSlots,
