@@ -95,6 +95,20 @@ const changeUserRole = async (req, res, next) => {
       return ApiResponse.notFound(res, "User not found.");
     }
 
+    if (user.role === ROLES.ADMIN) {
+      const activeAdmins = await User.countDocuments({
+        role: ROLES.ADMIN,
+        isActive: true,
+      });
+
+      if (activeAdmins <= 1) {
+        return ApiResponse.badRequest(
+          res,
+          "At least one active admin must remain in the system."
+        );
+      }
+    }
+
     user.role = user.role === ROLES.ADMIN ? ROLES.USER : ROLES.ADMIN;
 
     await user.save();
@@ -124,6 +138,20 @@ const toggleUserStatus = async (req, res, next) => {
 
     if (!user) {
       return ApiResponse.notFound(res, "User not found.");
+    }
+
+    if (user.role === ROLES.ADMIN && user.isActive) {
+      const activeAdmins = await User.countDocuments({
+        role: ROLES.ADMIN,
+        isActive: true,
+      });
+
+      if (activeAdmins <= 1) {
+        return ApiResponse.badRequest(
+          res,
+          "At least one active admin must remain in the system."
+        );
+      }
     }
 
     user.isActive = !user.isActive;
@@ -229,6 +257,9 @@ const approveBookingRequest = async (req, res, next) => {
       userEmail: request.userEmail,
       status: BOOKING_STATUS.CONFIRMED,
     });
+
+    await booking.populate("userId", "name email role");
+    await booking.populate("roomId", "name location capacity status isActive");
 
     request.status = ADMIN_REQUEST_STATUS.APPROVED;
     request.reviewedAt = new Date();

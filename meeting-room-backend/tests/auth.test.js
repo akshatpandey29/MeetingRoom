@@ -9,15 +9,15 @@ describe("Auth APIs", () => {
     expect(response.body.success).toBe(true);
   });
 
-  test("POST /api/auth/login should exist after auth routes are connected", async () => {
+  test("POST /api/auth/login should validate login payload", async () => {
     const response = await request(app)
       .post("/api/auth/login")
       .send({
-        email: "admin@gmail.com",
-        password: "Admin@123",
+        email: "not-an-email",
+        password: "",
       });
 
-    expect([200, 400, 401, 404]).toContain(response.statusCode);
-    
+    expect(response.statusCode).toBe(400);
+    expect(response.body.success).toBe(false);
   });
 });
