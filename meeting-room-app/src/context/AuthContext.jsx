@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { loginUser, registerUser, logoutUser } from "../services/api";
 import api from "../services/api";
 
@@ -14,42 +14,68 @@ export const AuthProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ── On app load — restore session from localStorage ─────────────────────────
-  useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const savedToken = localStorage.getItem("token");
+  const normalizeUser = useCallback((currentUser) => {
+    if (!currentUser) return null;
 
-    if (savedUser && savedToken) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        setUser(parsedUser);
-        setToken(savedToken);
-      } catch {
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
-      }
-    }
-
-    setLoading(false);
+    return {
+      ...currentUser,
+      id: currentUser.id || currentUser._id,
+      status:
+        currentUser.status ||
+        (currentUser.isActive === false ? "disabled" : "active"),
+    };
   }, []);
 
+  // ── On app load — restore session from auth cookie ─────────────────────────
+  useEffect(() => {
+    let isMounted = true;
+
+    const restoreSession = async () => {
+      try {
+        const response = await api.get("/auth/profile");
+        const profileUser = normalizeUser(response.data?.data?.user);
+
+        if (isMounted && profileUser) {
+          setUser(profileUser);
+          setToken("cookie-session");
+        }
+      } catch {
+        if (isMounted) {
+          setUser(null);
+          setToken(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [normalizeUser]);
+
   // ── Fetch all users (admin use) ─────────────────────────────────────────────
-  const fetchAllUsers = async () => {
+  const fetchAllUsers = useCallback(async () => {
     try {
       const response = await api.get("/admin/users");
       if (response.data?.success) {
-        setUsers(response.data.data || []);
+        const userList = response.data.data?.users || response.data.data || [];
+        setUsers(Array.isArray(userList) ? userList.map(normalizeUser) : []);
       }
     } catch {
       // silently fail
     }
-  };
+  }, [normalizeUser]);
 
   useEffect(() => {
     if (user?.role === "admin" && token) {
       fetchAllUsers();
     }
-  }, [user, token]);
+  }, [fetchAllUsers, token, user?.role]);
 
   // ── LOGIN ───────────────────────────────────────────────────────────────────
   const login = async (loginData) => {
@@ -61,13 +87,9 @@ export const AuthProvider = ({ children }) => {
       const response = await loginUser(loginData);
 
       if (response.success && response.data) {
-        const { user: loggedInUser, accessToken, refreshToken } = response.data;
+        const loggedInUser = normalizeUser(response.data.user);
 
-        localStorage.setItem("token", accessToken);
-        localStorage.setItem("refreshToken", refreshToken);
-        localStorage.setItem("user", JSON.stringify(loggedInUser));
-
-        setToken(accessToken);
+        setToken("cookie-session");
         setUser(loggedInUser);
 
         return { success: true, user: loggedInUser };
@@ -110,8 +132,13 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── LOGOUT ──────────────────────────────────────────────────────────────────
-  const logout = () => {
-    logoutUser();
+  const logout = async () => {
+    try {
+      await logoutUser();
+    } catch {
+      // Session is cleared locally even if the cookie is already expired.
+    }
+
     setUser(null);
     setToken(null);
     setUsers([]);
@@ -125,17 +152,14 @@ export const AuthProvider = ({ children }) => {
       if (response.data?.success) {
         const updatedUser = { ...user, name };
         setUser(updatedUser);
-        localStorage.setItem("user", JSON.stringify(updatedUser));
         return { success: true };
       }
 
       return { success: false, message: response.data?.message || "Update failed." };
 
     } catch {
-      // localStorage fallback
       const updatedUser = { ...user, name };
       setUser(updatedUser);
-      localStorage.setItem("user", JSON.stringify(updatedUser));
       return { success: true };
     }
   };
@@ -163,7 +187,7 @@ export const AuthProvider = ({ children }) => {
   // ── ADMIN — Change user role ────────────────────────────────────────────────
   const changeUserRole = async (userId) => {
     try {
-      const response = await api.put(`/admin/users/${userId}/role`);
+      const response = await api.patch(`/admin/users/${userId}/role`);
 
       if (response.data?.success) {
         await fetchAllUsers();
@@ -181,7 +205,7 @@ export const AuthProvider = ({ children }) => {
   // ── ADMIN — Toggle user status ──────────────────────────────────────────────
   const toggleUserStatus = async (userId) => {
     try {
-      const response = await api.put(`/admin/users/${userId}/status`);
+      const response = await api.patch(`/admin/users/${userId}/status`);
 
       if (response.data?.success) {
         await fetchAllUsers();
@@ -198,7 +222,7 @@ export const AuthProvider = ({ children }) => {
 
   // ── helpers ─────────────────────────────────────────────────────────────────
   const isAdmin = () => user?.role === "admin";
-  const isLoggedIn = () => user !== null && token !== null;
+  const isLoggedIn = () => user !== null;
 
   const admins = users.filter((u) => u.role === "admin");
   const normalUsers = users.filter((u) => u.role === "user");

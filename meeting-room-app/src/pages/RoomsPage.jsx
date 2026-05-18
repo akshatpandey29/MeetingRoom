@@ -325,6 +325,33 @@ function RoomsPage() {
             Search and book available rooms for your office meetings.
           </p>
         </div>
+                {/* Quick Summary */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+          {summaryCards.map((card) => (
+            <div
+              key={card.title}
+              className="bg-white border border-gray-200 rounded-xl shadow-sm p-3.5 flex items-center gap-3"
+            >
+              <div
+                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm ${card.bg} ${card.color}`}
+              >
+                {card.icon}
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-500">{card.title}</p>
+
+                <h3 className="text-xl font-bold text-slate-900 leading-tight">
+                  {card.value}
+                </h3>
+
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {card.helper}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
 
         {/* Booking Preferences */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
@@ -508,33 +535,6 @@ function RoomsPage() {
           </div>
         </div>
 
-        {/* Quick Summary */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
-          {summaryCards.map((card) => (
-            <div
-              key={card.title}
-              className="bg-white border border-gray-200 rounded-xl shadow-sm p-3.5 flex items-center gap-3"
-            >
-              <div
-                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm ${card.bg} ${card.color}`}
-              >
-                {card.icon}
-              </div>
-
-              <div>
-                <p className="text-xs text-slate-500">{card.title}</p>
-
-                <h3 className="text-xl font-bold text-slate-900 leading-tight">
-                  {card.value}
-                </h3>
-
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {card.helper}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
 
         {/* Rooms Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">

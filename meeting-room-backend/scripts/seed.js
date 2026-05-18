@@ -48,7 +48,6 @@ const seedData = async () => {
     ]);
 
     console.log("Seed completed successfully.");
-    console.log("Chal chal chup chapp code kar");
     console.log("Admin login: admin@plaxonic.com / Admin@123");
     console.log("User login: user@plaxonic.com / User@123");
 

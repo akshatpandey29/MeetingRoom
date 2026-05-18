@@ -5,6 +5,44 @@ const ApiResponse = require('../utils/apiResponse');
 const { validateRequest } = require('../middleware/validateRequest');
 const { sendEmail } = require('../services/emailService');
 const User = require('../models/userModel');
+const env = require('../config/env');
+
+const ACCESS_COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+const getCookieOptions = (maxAge) => ({
+  httpOnly: true,
+  secure: env.nodeEnv === 'production',
+  sameSite: env.nodeEnv === 'production' ? 'none' : 'lax',
+  maxAge,
+  path: '/',
+});
+
+const getClearCookieOptions = () => ({
+  httpOnly: true,
+  secure: env.nodeEnv === 'production',
+  sameSite: env.nodeEnv === 'production' ? 'none' : 'lax',
+  path: '/',
+});
+
+const setAuthCookies = (res, tokens) => {
+  res.cookie(
+    'accessToken',
+    tokens.accessToken,
+    getCookieOptions(ACCESS_COOKIE_MAX_AGE)
+  );
+
+  res.cookie(
+    'refreshToken',
+    tokens.refreshToken,
+    getCookieOptions(REFRESH_COOKIE_MAX_AGE)
+  );
+};
+
+const clearAuthCookies = (res) => {
+  res.clearCookie('accessToken', getClearCookieOptions());
+  res.clearCookie('refreshToken', getClearCookieOptions());
+};
 
 const registerValidation = [
   body('name')
@@ -60,6 +98,8 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
   try {
     const { user, tokens } = await authService.loginUser(req.body);
+    setAuthCookies(res, tokens);
+
     return ApiResponse.success(res, {
       user,
       accessToken: tokens.accessToken,
@@ -76,11 +116,14 @@ const login = async (req, res, next) => {
 // ── Refresh Token ─────────────────────────────────────────────────────────────
 const refreshToken = async (req, res, next) => {
   try {
-    const { token } = req.body;
+    const token = req.cookies?.refreshToken || req.body.token;
     if (!token) {
       return ApiResponse.badRequest(res, 'Refresh token required');
     }
+
     const { user, tokens } = await authService.refreshTokens(token);
+    setAuthCookies(res, tokens);
+
     return ApiResponse.success(res, {
       user,
       accessToken: tokens.accessToken,
@@ -98,6 +141,8 @@ const refreshToken = async (req, res, next) => {
 const logout = async (req, res, next) => {
   try {
     await authService.logoutUser(req.user._id);
+    clearAuthCookies(res);
+
     return ApiResponse.success(res, null, 'Logout successful');
   } catch (error) {
     next(error);
