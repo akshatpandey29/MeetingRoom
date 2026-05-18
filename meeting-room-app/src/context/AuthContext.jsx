@@ -1,13 +1,6 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import {
-  changeAdminUserRole,
-  getAdminUsers,
-  getProfile,
-  loginUser,
-  logoutUser,
-  registerUser,
-  toggleAdminUserStatus,
-} from "../services/api";
+import { createContext, useContext, useEffect, useState } from "react";
+import { loginUser, registerUser, logoutUser } from "../services/api";
+import api from "../services/api";
 
 const AuthContext = createContext();
 
@@ -15,281 +8,200 @@ export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-function getId(value) {
-  if (!value) return "";
-  return String(value._id || value.id || value);
-}
-
-function normalizeUser(user) {
-  if (!user) return null;
-
-  return {
-    ...user,
-    id: getId(user),
-    _id: getId(user),
-    name: user.name || "",
-    email: user.email || "",
-    role: user.role || "user",
-    isActive: user.isActive ?? user.status !== "disabled",
-    status: user.isActive === false || user.status === "disabled" ? "disabled" : "active",
-    createdAt: user.createdAt || "",
-  };
-}
-
-function getErrorMessage(error, fallbackMessage = "Something went wrong.") {
-  return (
-    error?.response?.data?.message ||
-    error?.response?.data?.errors?.[0]?.message ||
-    error?.message ||
-    fallbackMessage
-  );
-}
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [usersLoading, setUsersLoading] = useState(false);
 
-  const saveSessionUser = (nextUser) => {
-    if (!nextUser) {
-      localStorage.removeItem("user");
-      localStorage.removeItem("token");
-      setUser(null);
-      setToken(null);
-      return;
-    }
-
-    localStorage.setItem("user", JSON.stringify(nextUser));
-    localStorage.setItem("token", "cookie-session");
-    setUser(nextUser);
-    setToken("cookie-session");
-  };
-
-  const fetchUsers = async () => {
-    try {
-      setUsersLoading(true);
-      const response = await getAdminUsers();
-      const nextUsers = response?.data?.users || [];
-      setUsers(nextUsers.map(normalizeUser).filter(Boolean));
-      return {
-        success: true,
-        message: response?.message || "Users fetched successfully.",
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: getErrorMessage(error, "Users could not be fetched."),
-      };
-    } finally {
-      setUsersLoading(false);
-    }
-  };
-
+  // ── On app load — restore session from localStorage ─────────────────────────
   useEffect(() => {
-    let isMounted = true;
+    const savedUser = localStorage.getItem("user");
+    const savedToken = localStorage.getItem("token");
 
-    const hydrateSession = async () => {
+    if (savedUser && savedToken) {
       try {
-        const response = await getProfile();
-        if (!isMounted) return;
-
-        const currentUser = normalizeUser(response?.data?.user);
-        saveSessionUser(currentUser);
-        setUsers(currentUser ? [currentUser] : []);
-      } catch (error) {
-        if (!isMounted) return;
-
-        saveSessionUser(null);
-        setUsers([]);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        setToken(savedToken);
+      } catch {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
       }
-    };
+    }
 
-    hydrateSession();
-
-    return () => {
-      isMounted = false;
-    };
+    setLoading(false);
   }, []);
 
+  // ── Fetch all users (admin use) ─────────────────────────────────────────────
+  const fetchAllUsers = async () => {
+    try {
+      const response = await api.get("/admin/users");
+      if (response.data?.success) {
+        setUsers(response.data.data || []);
+      }
+    } catch {
+      // silently fail
+    }
+  };
+
   useEffect(() => {
-    if (!user) {
-      setUsers([]);
-      return;
+    if (user?.role === "admin" && token) {
+      fetchAllUsers();
     }
+  }, [user, token]);
 
-    if (user.role === "admin") {
-      fetchUsers();
-      return;
-    }
-
-    setUsers([user]);
-  }, [user]);
-
+  // ── LOGIN ───────────────────────────────────────────────────────────────────
   const login = async (loginData) => {
     try {
       if (!loginData.email || !loginData.password) {
-        return {
-          success: false,
-          message: "Please enter email and password",
-        };
+        return { success: false, message: "Please enter email and password" };
       }
 
       const response = await loginUser(loginData);
-      const loggedInUser = normalizeUser(response?.data?.user);
 
-      if (!loggedInUser) {
-        return {
-          success: false,
-          message: "Login failed. User data was not returned.",
-        };
+      if (response.success && response.data) {
+        const { user: loggedInUser, accessToken, refreshToken } = response.data;
+
+        localStorage.setItem("token", accessToken);
+        localStorage.setItem("refreshToken", refreshToken);
+        localStorage.setItem("user", JSON.stringify(loggedInUser));
+
+        setToken(accessToken);
+        setUser(loggedInUser);
+
+        return { success: true, user: loggedInUser };
       }
 
-      saveSessionUser(loggedInUser);
-      setUsers([loggedInUser]);
-
-      if (loggedInUser.role === "admin") {
-        fetchUsers();
-      }
-
-      return {
-        success: true,
-        user: loggedInUser,
-        message: response?.message || "Login successful",
-      };
-    } catch (error) {
       return {
         success: false,
-        message: getErrorMessage(error, "Login failed"),
+        message: response.message || "Login failed. Please check your credentials.",
       };
+
+    } catch (error) {
+      const message = error.response?.data?.message || "Login failed. Please try again.";
+      return { success: false, message };
     }
   };
 
+  // ── REGISTER ────────────────────────────────────────────────────────────────
   const register = async (registerData) => {
     try {
-      const response = await registerUser(registerData);
-      const createdUser = normalizeUser(response?.data?.user);
+      const response = await registerUser({
+        name: registerData.name,
+        email: registerData.email,
+        password: registerData.password,
+        role: "user",
+      });
 
-      if (createdUser) {
-        setUsers((previousUsers) => {
-          const exists = previousUsers.some(
-            (currentUser) => currentUser.id === createdUser.id
-          );
-
-          return exists ? previousUsers : [...previousUsers, createdUser];
-        });
+      if (response && response.success) {
+        return { success: true };
       }
 
       return {
-        success: true,
-        data: createdUser,
-        message: response?.message || "Registration successful",
-      };
-    } catch (error) {
-      return {
         success: false,
-        message: getErrorMessage(error, "Registration failed"),
+        message: response?.message || "Registration failed.",
       };
+
+    } catch (error) {
+      const message = error.response?.data?.message || "Registration failed. Please try again.";
+      return { success: false, message };
     }
   };
 
+  // ── LOGOUT ──────────────────────────────────────────────────────────────────
+  const logout = () => {
+    logoutUser();
+    setUser(null);
+    setToken(null);
+    setUsers([]);
+  };
+
+  // ── UPDATE PROFILE ──────────────────────────────────────────────────────────
+  const updateProfile = async ({ name }) => {
+    try {
+      const response = await api.put("/auth/profile", { name });
+
+      if (response.data?.success) {
+        const updatedUser = { ...user, name };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        return { success: true };
+      }
+
+      return { success: false, message: response.data?.message || "Update failed." };
+
+    } catch {
+      // localStorage fallback
+      const updatedUser = { ...user, name };
+      setUser(updatedUser);
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      return { success: true };
+    }
+  };
+
+  // ── CHANGE PASSWORD ─────────────────────────────────────────────────────────
+  const changePassword = async ({ currentPassword, newPassword }) => {
+    try {
+      const response = await api.put("/auth/change-password", {
+        currentPassword,
+        newPassword,
+      });
+
+      if (response.data?.success) {
+        return { success: true };
+      }
+
+      return { success: false, message: response.data?.message || "Password change failed." };
+
+    } catch (error) {
+      const message = error.response?.data?.message || "Password change failed. Please try again.";
+      return { success: false, message };
+    }
+  };
+
+  // ── ADMIN — Change user role ────────────────────────────────────────────────
   const changeUserRole = async (userId) => {
     try {
-      if (String(user?.id) === String(userId)) {
-        return {
-          success: false,
-          message: "You cannot change your own admin role.",
-        };
+      const response = await api.put(`/admin/users/${userId}/role`);
+
+      if (response.data?.success) {
+        await fetchAllUsers();
+        return { success: true, message: "User role updated successfully." };
       }
 
-      const response = await changeAdminUserRole(userId);
-      const updatedUser = normalizeUser(response?.data?.user);
+      return { success: false, message: response.data?.message || "Role update failed." };
 
-      if (updatedUser) {
-        setUsers((previousUsers) =>
-          previousUsers.map((currentUser) =>
-            currentUser.id === updatedUser.id ? updatedUser : currentUser
-          )
-        );
-      }
-
-      return {
-        success: true,
-        message: response?.message || "User role updated successfully.",
-      };
     } catch (error) {
-      return {
-        success: false,
-        message: getErrorMessage(error, "User role could not be updated."),
-      };
+      const message = error.response?.data?.message || "Role update failed.";
+      return { success: false, message };
     }
   };
 
+  // ── ADMIN — Toggle user status ──────────────────────────────────────────────
   const toggleUserStatus = async (userId) => {
     try {
-      if (String(user?.id) === String(userId)) {
-        return {
-          success: false,
-          message: "You cannot disable your own account.",
-        };
+      const response = await api.put(`/admin/users/${userId}/status`);
+
+      if (response.data?.success) {
+        await fetchAllUsers();
+        return { success: true, message: "User status updated successfully." };
       }
 
-      const response = await toggleAdminUserStatus(userId);
-      const updatedUser = normalizeUser(response?.data?.user);
+      return { success: false, message: response.data?.message || "Status update failed." };
 
-      if (updatedUser) {
-        setUsers((previousUsers) =>
-          previousUsers.map((currentUser) =>
-            currentUser.id === updatedUser.id ? updatedUser : currentUser
-          )
-        );
-      }
-
-      return {
-        success: true,
-        message: response?.message || "User status updated successfully.",
-      };
     } catch (error) {
-      return {
-        success: false,
-        message: getErrorMessage(error, "User status could not be updated."),
-      };
+      const message = error.response?.data?.message || "Status update failed.";
+      return { success: false, message };
     }
   };
 
-  const logout = async () => {
-    try {
-      await logoutUser();
-    } catch (error) {
-      // Clear local session even if the server session is already gone.
-    } finally {
-      saveSessionUser(null);
-      setUsers([]);
-    }
-  };
+  // ── helpers ─────────────────────────────────────────────────────────────────
+  const isAdmin = () => user?.role === "admin";
+  const isLoggedIn = () => user !== null && token !== null;
 
-  const isAdmin = () => {
-    return user?.role === "admin";
-  };
-
-  const isLoggedIn = () => {
-    return user !== null;
-  };
-
-  const admins = useMemo(
-    () => users.filter((currentUser) => currentUser.role === "admin"),
-    [users]
-  );
-
-  const normalUsers = useMemo(
-    () => users.filter((currentUser) => currentUser.role === "user"),
-    [users]
-  );
+  const admins = users.filter((u) => u.role === "admin");
+  const normalUsers = users.filter((u) => u.role === "user");
 
   const value = {
     user,
@@ -304,9 +216,11 @@ export const AuthProvider = ({ children }) => {
     logout,
     isAdmin,
     isLoggedIn,
-    fetchUsers,
+    updateProfile,
+    changePassword,
     changeUserRole,
     toggleUserStatus,
+    fetchAllUsers,
   };
 
   return (

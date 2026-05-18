@@ -34,7 +34,8 @@ const registerUser = async ({ name, email, password }) => {
     password,
     role: ROLES.USER,
   });
-    await emailService.sendWelcomeEmail({
+
+  await emailService.sendWelcomeEmail({
     to: user.email,
     name: user.name,
   });
@@ -96,9 +97,31 @@ const logoutUser = async (userId) => {
   logger.info(`User logged out: ${userId}`);
 };
 
+// ── Update Password ───────────────────────────────────────────────────────────
+// Used by reset password flow — finds user by ID and sets new password
+// bcrypt hashing is handled automatically by the userModel pre-save hook
+const updatePassword = async (userId, newPassword) => {
+  const user = await User.findById(userId).select("+password");
+
+  if (!user) {
+    throw { status: 404, message: "User not found" };
+  }
+
+  // Set new password — pre-save hook in userModel will hash it automatically
+  user.password = newPassword;
+
+  // Save with validation so password length check runs
+  await user.save();
+
+  logger.info(`Password updated for user: ${user.email}`);
+
+  return user;
+};
+
 module.exports = {
   registerUser,
   loginUser,
   refreshTokens,
   logoutUser,
+  updatePassword,
 };
