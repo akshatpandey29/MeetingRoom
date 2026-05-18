@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   FaSearch,
   FaEye,
@@ -8,6 +8,10 @@ import {
   FaTimes,
   FaCheckCircle,
   FaTimesCircle,
+  FaEnvelope,
+  FaCalendarAlt,
+  FaUser,
+  FaUsers,
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import ConfirmModal from "../components/ConfirmModal";
@@ -31,6 +35,7 @@ function UserManagement() {
     title: "",
     message: "",
     confirmText: "",
+    tone: "red",
     payload: null,
   });
 
@@ -48,12 +53,20 @@ function UserManagement() {
     }, 3000);
   };
 
-  const openModal = ({ actionType, title, message, confirmText, payload }) => {
+  const openModal = ({
+    actionType,
+    title,
+    message,
+    confirmText,
+    tone = "red",
+    payload,
+  }) => {
     setModalData({
       actionType,
       title,
       message,
       confirmText,
+      tone,
       payload,
     });
 
@@ -68,6 +81,7 @@ function UserManagement() {
       title: "",
       message: "",
       confirmText: "",
+      tone: "red",
       payload: null,
     });
   };
@@ -81,11 +95,12 @@ function UserManagement() {
     }
 
     if (modalData.actionType === "changeRole") {
-      changeUserRole(selectedActionUser.id);
+      const result = changeUserRole(selectedActionUser.id);
 
       showMessage(
-        `${selectedActionUser.name}'s role changed successfully.`,
-        "success"
+        result.message ||
+          `${selectedActionUser.name}'s role changed successfully.`,
+        result.success ? "success" : "error"
       );
 
       closeModal();
@@ -93,17 +108,17 @@ function UserManagement() {
     }
 
     if (modalData.actionType === "toggleStatus") {
-      toggleUserStatus(selectedActionUser.id);
+      const result = toggleUserStatus(selectedActionUser.id);
 
       showMessage(
-        selectedActionUser.status === "active"
-          ? `${selectedActionUser.name} has been disabled successfully.`
-          : `${selectedActionUser.name} has been enabled successfully.`,
-        "success"
+        result.message ||
+          (selectedActionUser.status === "active"
+            ? `${selectedActionUser.name} has been disabled successfully.`
+            : `${selectedActionUser.name} has been enabled successfully.`),
+        result.success ? "success" : "error"
       );
 
       closeModal();
-      return;
     }
   };
 
@@ -123,35 +138,49 @@ function UserManagement() {
     });
   };
 
-  const sortedUsers = [...users].sort((firstUser, secondUser) => {
-    if (firstUser.role === "admin" && secondUser.role !== "admin") {
-      return -1;
-    }
+  const sortedUsers = useMemo(() => {
+    return [...users].sort((firstUser, secondUser) => {
+      if (firstUser.role === "admin" && secondUser.role !== "admin") {
+        return -1;
+      }
 
-    if (firstUser.role !== "admin" && secondUser.role === "admin") {
-      return 1;
-    }
+      if (firstUser.role !== "admin" && secondUser.role === "admin") {
+        return 1;
+      }
 
-    return firstUser.name.localeCompare(secondUser.name);
-  });
+      return firstUser.name.localeCompare(secondUser.name);
+    });
+  }, [users]);
 
-  const filteredUsers = sortedUsers.filter((currentUser) => {
-    const searchValue = userSearch.toLowerCase();
+  const filteredUsers = useMemo(() => {
+    return sortedUsers.filter((currentUser) => {
+      const searchValue = userSearch.toLowerCase().trim();
 
-    const matchesSearch =
-      currentUser.name.toLowerCase().includes(searchValue) ||
-      currentUser.email.toLowerCase().includes(searchValue);
+      const matchesSearch =
+        currentUser.name.toLowerCase().includes(searchValue) ||
+        currentUser.email.toLowerCase().includes(searchValue);
 
-    const matchesRole =
-      roleFilter === "all" || currentUser.role === roleFilter;
+      const matchesRole =
+        roleFilter === "all" || currentUser.role === roleFilter;
 
-    return matchesSearch && matchesRole;
-  });
+      return matchesSearch && matchesRole;
+    });
+  }, [sortedUsers, userSearch, roleFilter]);
+
+  const totalAdmins = users.filter(
+    (currentUser) => currentUser.role === "admin"
+  ).length;
+
+  const totalEmployees = users.filter(
+    (currentUser) => currentUser.role !== "admin"
+  ).length;
+
+  const activeUsers = users.filter(
+    (currentUser) => currentUser.status === "active"
+  ).length;
 
   const handleViewUser = (currentUser) => {
     setSelectedUser(currentUser);
-
-    showMessage(`${currentUser.name}'s details are now visible.`, "success");
   };
 
   const handleChangeRoleClick = (currentUser) => {
@@ -169,6 +198,7 @@ function UserManagement() {
           : `Are you sure you want to change ${currentUser.name} from user to admin?`,
       confirmText:
         currentUser.role === "admin" ? "Yes, Make User" : "Yes, Make Admin",
+      tone: "purple",
       payload: currentUser,
     });
   };
@@ -179,372 +209,622 @@ function UserManagement() {
       return;
     }
 
+    const isActive = currentUser.status === "active";
+
     openModal({
       actionType: "toggleStatus",
-      title:
-        currentUser.status === "active"
-          ? "Disable User Account"
-          : "Enable User Account",
-      message:
-        currentUser.status === "active"
-          ? `Are you sure you want to disable ${currentUser.name}? This user will not be able to login.`
-          : `Are you sure you want to enable ${currentUser.name}? This user will be able to login again.`,
-      confirmText:
-        currentUser.status === "active" ? "Yes, Disable" : "Yes, Enable",
+      title: isActive ? "Disable User Account" : "Enable User Account",
+      message: isActive
+        ? `Are you sure you want to disable ${currentUser.name}? This user will not be able to login.`
+        : `Are you sure you want to enable ${currentUser.name}? This user will be able to login again.`,
+      confirmText: isActive ? "Yes, Disable" : "Yes, Enable",
+      tone: isActive ? "red" : "green",
       payload: currentUser,
     });
   };
 
+  const clearFilters = () => {
+    setUserSearch("");
+    setRoleFilter("all");
+  };
+
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+    <div className="space-y-5">
       <ConfirmModal
         isOpen={modalOpen}
         title={modalData.title}
         message={modalData.message}
         confirmText={modalData.confirmText}
         cancelText="No, Keep it"
+        tone={modalData.tone}
         onConfirm={handleConfirmModalAction}
         onCancel={closeModal}
       />
 
-      <div className="p-6 border-b border-gray-100">
-        <h2 className="text-xl font-semibold text-slate-900">
-          User Management
-        </h2>
-
-        <p className="text-sm text-slate-500 mt-1">
-          Admins are shown first, then normal users. Search, filter, and manage
-          access.
-        </p>
-      </div>
-
-      <div className="p-6 border-b border-gray-100">
-        {message.text && (
-          <div
-            className={`mb-5 px-4 py-3 rounded-xl text-sm border flex items-center gap-2 ${
-              message.type === "success"
-                ? "bg-green-50 border-green-100 text-green-700"
-                : "bg-red-50 border-red-100 text-red-600"
-            }`}
-          >
-            {message.type === "success" ? (
-              <FaCheckCircle size={14} />
-            ) : (
-              <FaTimesCircle size={14} />
-            )}
-            <span>{message.text}</span>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-4">
-          <div className="relative">
-            <FaSearch
-              size={13}
-              className="absolute left-4 top-3.5 text-slate-400"
-            />
-
-            <input
-              type="text"
-              placeholder="Search by name or email..."
-              value={userSearch}
-              onChange={(event) => setUserSearch(event.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Roles</option>
-            <option value="admin">Admins</option>
-            <option value="user">Users</option>
-          </select>
-        </div>
-      </div>
-
       {selectedUser && (
-        <div className="m-6 bg-blue-50 border border-blue-100 rounded-xl p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-semibold text-blue-800 mb-1">
-                User Details
-              </p>
+        <UserDetailsModal
+          currentUser={selectedUser}
+          loggedInUser={user}
+          formatUserDate={formatUserDate}
+          onClose={() => setSelectedUser(null)}
+          onChangeRole={handleChangeRoleClick}
+          onToggleStatus={handleToggleStatusClick}
+        />
+      )}
 
-              <h3 className="text-lg font-semibold text-slate-900">
-                {selectedUser.name}
-              </h3>
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-5">
+          <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
+            Users
+          </p>
 
-              <div className="mt-2 space-y-1">
-                <p className="text-sm text-slate-600">
-                  <strong>Email:</strong> {selectedUser.email}
-                </p>
+          <h2 className="text-xl font-bold text-slate-900">
+            User Management
+          </h2>
 
-                <p className="text-sm text-slate-600">
-                  <strong>Role:</strong> {selectedUser.role}
-                </p>
+          <p className="mt-1 text-sm leading-6 text-slate-500">
+            View employees, manage roles, and control account access.
+          </p>
+        </div>
 
-                <p className="text-sm text-slate-600">
-                  <strong>Status:</strong> {selectedUser.status}
-                </p>
+        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-5 sm:grid-cols-2 lg:grid-cols-4">
+          <UserSummaryCard
+            icon={<FaUsers />}
+            label="Total Users"
+            value={users.length}
+            helper="All employees"
+            tone="blue"
+          />
 
-                <p className="text-sm text-slate-600">
-                  <strong>Created Date:</strong>{" "}
-                  {formatUserDate(selectedUser.createdAt)}
-                </p>
-              </div>
+          <UserSummaryCard
+            icon={<FaUserShield />}
+            label="Admins"
+            value={totalAdmins}
+            helper="Admin access"
+            tone="purple"
+          />
+
+          <UserSummaryCard
+            icon={<FaUser />}
+            label="Employees"
+            value={totalEmployees}
+            helper="Normal users"
+            tone="green"
+          />
+
+          <UserSummaryCard
+            icon={<FaUserCheck />}
+            label="Active"
+            value={activeUsers}
+            helper="Can login"
+            tone="slate"
+          />
+        </div>
+
+        <div className="border-b border-slate-100 bg-slate-50/60 p-5">
+          {message.text && (
+            <div
+              className={`mb-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm font-medium ${
+                message.type === "success"
+                  ? "border-green-100 bg-green-50 text-green-700"
+                  : "border-red-100 bg-red-50 text-red-600"
+              }`}
+            >
+              <span className="mt-0.5">
+                {message.type === "success" ? (
+                  <FaCheckCircle size={14} />
+                ) : (
+                  <FaTimesCircle size={14} />
+                )}
+              </span>
+
+              <span>{message.text}</span>
             </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px_auto]">
+            <div className="relative">
+              <FaSearch
+                size={13}
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+
+              <input
+                type="text"
+                placeholder="Search by name or email..."
+                value={userSearch}
+                onChange={(event) => setUserSearch(event.target.value)}
+                className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+              />
+            </div>
+
+            <select
+              value={roleFilter}
+              onChange={(event) => setRoleFilter(event.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
+            >
+              <option value="all">All Roles</option>
+              <option value="admin">Admins</option>
+              <option value="user">Users</option>
+            </select>
 
             <button
               type="button"
-              onClick={() => setSelectedUser(null)}
-              className="p-2 bg-white text-slate-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+              onClick={clearFilters}
+              className="h-11 rounded-xl bg-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-300"
             >
-              <FaTimes size={13} />
+              Clear
             </button>
           </div>
         </div>
-      )}
 
-      {filteredUsers.length > 0 ? (
-        <>
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <th className="text-left px-6 py-4 font-semibold text-slate-600">
-                    Name
-                  </th>
-                  <th className="text-left px-6 py-4 font-semibold text-slate-600">
-                    Email
-                  </th>
-                  <th className="text-left px-6 py-4 font-semibold text-slate-600">
-                    Role
-                  </th>
-                  <th className="text-left px-6 py-4 font-semibold text-slate-600">
-                    Created Date
-                  </th>
-                  <th className="text-left px-6 py-4 font-semibold text-slate-600">
-                    Status
-                  </th>
-                  <th className="text-left px-6 py-4 font-semibold text-slate-600">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
+        {filteredUsers.length > 0 ? (
+          <>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-slate-50">
+                  <tr>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Created Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </tr>
+                </thead>
 
-              <tbody className="divide-y divide-gray-100">
-                {filteredUsers.map((currentUser) => {
-                  const isCurrentLoggedInUser = currentUser.id === user?.id;
+                <tbody className="divide-y divide-slate-100">
+                  {filteredUsers.map((currentUser) => {
+                    const isCurrentLoggedInUser = currentUser.id === user?.id;
 
-                  return (
-                    <tr key={currentUser.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
-                              currentUser.role === "admin"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-blue-100 text-blue-700"
-                            }`}
-                          >
-                            {currentUser.name.charAt(0).toUpperCase()}
+                    return (
+                      <tr
+                        key={currentUser.id}
+                        className="transition hover:bg-slate-50"
+                      >
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <UserAvatar user={currentUser} />
+
+                            <div>
+                              <p className="font-semibold text-slate-900">
+                                {currentUser.name}
+                              </p>
+
+                              {isCurrentLoggedInUser && (
+                                <p className="text-xs font-medium text-blue-600">
+                                  Current admin
+                                </p>
+                              )}
+                            </div>
                           </div>
+                        </td>
 
-                          <span className="font-medium text-slate-900">
+                        <td className="px-5 py-4 text-slate-500">
+                          {currentUser.email}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <RoleBadge role={currentUser.role} />
+                        </td>
+
+                        <td className="px-5 py-4 text-slate-500">
+                          {formatUserDate(currentUser.createdAt)}
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <StatusBadge status={currentUser.status} />
+                        </td>
+
+                        <td className="px-5 py-4">
+                          <div className="flex flex-wrap gap-2">
+                            <ActionButton
+                              type="view"
+                              label="View"
+                              icon={<FaEye size={11} />}
+                              onClick={() => handleViewUser(currentUser)}
+                            />
+
+                            <ActionButton
+                              type="role"
+                              label="Change Role"
+                              icon={<FaUserShield size={11} />}
+                              disabled={isCurrentLoggedInUser}
+                              onClick={() =>
+                                handleChangeRoleClick(currentUser)
+                              }
+                            />
+
+                            <ActionButton
+                              type={
+                                currentUser.status === "active"
+                                  ? "danger"
+                                  : "success"
+                              }
+                              label={
+                                currentUser.status === "active"
+                                  ? "Disable"
+                                  : "Enable"
+                              }
+                              icon={
+                                currentUser.status === "active" ? (
+                                  <FaUserSlash size={11} />
+                                ) : (
+                                  <FaUserCheck size={11} />
+                                )
+                              }
+                              disabled={isCurrentLoggedInUser}
+                              onClick={() =>
+                                handleToggleStatusClick(currentUser)
+                              }
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="divide-y divide-slate-100 lg:hidden">
+              {filteredUsers.map((currentUser) => {
+                const isCurrentLoggedInUser = currentUser.id === user?.id;
+
+                return (
+                  <div key={currentUser.id} className="p-5">
+                    <div className="flex items-start gap-3">
+                      <UserAvatar user={currentUser} />
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="font-semibold text-slate-900">
                             {currentUser.name}
+                          </h3>
+
+                          <RoleBadge role={currentUser.role} />
+                        </div>
+
+                        <p className="mt-1 break-all text-sm text-slate-500">
+                          {currentUser.email}
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <StatusBadge status={currentUser.status} />
+
+                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                            {formatUserDate(currentUser.createdAt)}
                           </span>
                         </div>
-                      </td>
-
-                      <td className="px-6 py-4 text-slate-500">
-                        {currentUser.email}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span
-                          className={`inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full ${
-                            currentUser.role === "admin"
-                              ? "bg-purple-100 text-purple-700"
-                              : "bg-blue-100 text-blue-700"
-                          }`}
-                        >
-                          {currentUser.role === "admin" && (
-                            <FaUserShield size={11} />
-                          )}
-                          {currentUser.role}
-                        </span>
-                      </td>
-
-                      <td className="px-6 py-4 text-slate-500">
-                        {formatUserDate(currentUser.createdAt)}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <span
-                          className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                            currentUser.status === "active"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {currentUser.status}
-                        </span>
-                      </td>
-
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleViewUser(currentUser)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
-                          >
-                            <FaEye size={11} />
-                            View
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isCurrentLoggedInUser}
-                            onClick={() => handleChangeRoleClick(currentUser)}
-                            className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                          >
-                            <FaUserShield size={11} />
-                            Change Role
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isCurrentLoggedInUser}
-                            onClick={() => handleToggleStatusClick(currentUser)}
-                            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${
-                              currentUser.status === "active"
-                                ? "bg-red-50 text-red-600 hover:bg-red-100"
-                                : "bg-green-50 text-green-600 hover:bg-green-100"
-                            }`}
-                          >
-                            {currentUser.status === "active" ? (
-                              <FaUserSlash size={11} />
-                            ) : (
-                              <FaUserCheck size={11} />
-                            )}
-                            {currentUser.status === "active"
-                              ? "Disable"
-                              : "Enable"}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="md:hidden divide-y divide-gray-100">
-            {filteredUsers.map((currentUser) => {
-              const isCurrentLoggedInUser = currentUser.id === user?.id;
-
-              return (
-                <div key={currentUser.id} className="p-5">
-                  <div className="flex items-start justify-between gap-3 mb-4">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">
-                        {currentUser.name}
-                      </h3>
-
-                      <p className="text-sm text-slate-500 mt-1">
-                        {currentUser.email}
-                      </p>
+                      </div>
                     </div>
 
-                    <span
-                      className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                        currentUser.role === "admin"
-                          ? "bg-purple-100 text-purple-700"
-                          : "bg-blue-100 text-blue-700"
-                      }`}
-                    >
-                      {currentUser.role}
-                    </span>
-                  </div>
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      <ActionButton
+                        type="view"
+                        label="View"
+                        icon={<FaEye size={11} />}
+                        onClick={() => handleViewUser(currentUser)}
+                        fullWidth
+                      />
 
-                  <div className="space-y-2 text-sm text-slate-600 mb-4">
-                    <p>
-                      <strong>Created:</strong>{" "}
-                      {formatUserDate(currentUser.createdAt)}
-                    </p>
+                      <ActionButton
+                        type="role"
+                        label="Change Role"
+                        icon={<FaUserShield size={11} />}
+                        disabled={isCurrentLoggedInUser}
+                        onClick={() => handleChangeRoleClick(currentUser)}
+                        fullWidth
+                      />
 
-                    <p>
-                      <strong>Status:</strong>{" "}
-                      <span
-                        className={
+                      <ActionButton
+                        type={
                           currentUser.status === "active"
-                            ? "text-green-600"
-                            : "text-red-600"
+                            ? "danger"
+                            : "success"
                         }
-                      >
-                        {currentUser.status}
-                      </span>
-                    </p>
+                        label={
+                          currentUser.status === "active"
+                            ? "Disable"
+                            : "Enable"
+                        }
+                        icon={
+                          currentUser.status === "active" ? (
+                            <FaUserSlash size={11} />
+                          ) : (
+                            <FaUserCheck size={11} />
+                          )
+                        }
+                        disabled={isCurrentLoggedInUser}
+                        onClick={() => handleToggleStatusClick(currentUser)}
+                        fullWidth
+                      />
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </>
+        ) : (
+          <div className="flex min-h-[240px] items-center justify-center px-6 py-10 text-center">
+            <div>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+                <FaUsers size={22} />
+              </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleViewUser(currentUser)}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
-                    >
-                      <FaEye size={11} />
-                      View
-                    </button>
+              <h3 className="text-base font-bold text-slate-900">
+                No users found
+              </h3>
 
-                    <button
-                      type="button"
-                      disabled={isCurrentLoggedInUser}
-                      onClick={() => handleChangeRoleClick(currentUser)}
-                      className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
-                    >
-                      <FaUserShield size={11} />
-                      Change Role
-                    </button>
+              <p className="mt-2 text-sm text-slate-500">
+                Try changing the search keyword or role filter.
+              </p>
 
-                    <button
-                      type="button"
-                      disabled={isCurrentLoggedInUser}
-                      onClick={() => handleToggleStatusClick(currentUser)}
-                      className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed ${
-                        currentUser.status === "active"
-                          ? "bg-red-50 text-red-600 hover:bg-red-100"
-                          : "bg-green-50 text-green-600 hover:bg-green-100"
-                      }`}
-                    >
-                      {currentUser.status === "active" ? (
-                        <FaUserSlash size={11} />
-                      ) : (
-                        <FaUserCheck size={11} />
-                      )}
-                      {currentUser.status === "active" ? "Disable" : "Enable"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Clear Filters
+              </button>
+            </div>
           </div>
-        </>
-      ) : (
-        <div className="p-10 text-center">
-          <h3 className="text-lg font-semibold text-slate-800">
-            No users found
-          </h3>
-
-          <p className="text-sm text-slate-500 mt-2">
-            Try changing your search or role filter.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
+  );
+}
+
+function UserDetailsModal({
+  currentUser,
+  loggedInUser,
+  formatUserDate,
+  onClose,
+  onChangeRole,
+  onToggleStatus,
+}) {
+  const isCurrentLoggedInUser = currentUser.id === loggedInUser?.id;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/45 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-5">
+          <div className="flex items-center gap-3">
+            <UserAvatar user={currentUser} size="large" />
+
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">
+                {currentUser.name}
+              </h3>
+
+              <p className="mt-0.5 text-sm text-slate-500">
+                Employee account details
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-800"
+          >
+            <FaTimes size={13} />
+          </button>
+        </div>
+
+        <div className="px-5 py-5">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <DetailItem
+              icon={<FaEnvelope />}
+              label="Email"
+              value={currentUser.email}
+            />
+
+            <DetailItem
+              icon={<FaUserShield />}
+              label="Role"
+              value={<RoleBadge role={currentUser.role} />}
+            />
+
+            <DetailItem
+              icon={<FaUserCheck />}
+              label="Status"
+              value={<StatusBadge status={currentUser.status} />}
+            />
+
+            <DetailItem
+              icon={<FaCalendarAlt />}
+              label="Created Date"
+              value={formatUserDate(currentUser.createdAt)}
+            />
+          </div>
+
+          {isCurrentLoggedInUser && (
+            <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+              This is your current admin account. You cannot change your own
+              role or disable your own account.
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            Close
+          </button>
+
+          <button
+            type="button"
+              disabled={isCurrentLoggedInUser}
+              onClick={() => {
+                onClose();
+                setTimeout(() => {
+                  onChangeRole(currentUser);
+                }, 100);
+              }}
+              className="rounded-xl bg-purple-50 px-4 py-2.5 text-sm font-semibold text-purple-700 transition hover:bg-purple-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              Change Role
+            </button>
+
+            <button
+              type="button"
+              disabled={isCurrentLoggedInUser}
+              onClick={() => {
+                onClose();
+                setTimeout(() => {
+                  onToggleStatus(currentUser);
+                }, 100);
+              }}
+              className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+                currentUser.status === "active"
+                  ? "bg-red-50 text-red-700 hover:bg-red-100"
+                  : "bg-green-50 text-green-700 hover:bg-green-100"
+              }`}
+            >
+              {currentUser.status === "active" ? "Disable User" : "Enable User"}
+          </button>
+        </div>
+      </div>            
+    </div>
+  );
+}
+
+function UserSummaryCard({ icon, label, value, helper, tone = "blue" }) {
+  const toneClasses = {
+    blue: "bg-blue-50 text-blue-600",
+    purple: "bg-purple-50 text-purple-600",
+    green: "bg-green-50 text-green-600",
+    slate: "bg-slate-100 text-slate-600",
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-3">
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-xl ${
+            toneClasses[tone] || toneClasses.blue
+          }`}
+        >
+          {icon}
+        </div>
+
+        <div>
+          <p className="text-sm font-medium text-slate-500">{label}</p>
+          <p className="text-2xl font-bold leading-tight text-slate-900">
+            {value}
+          </p>
+          <p className="text-xs text-slate-400">{helper}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableHead({ children }) {
+  return (
+    <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+      {children}
+    </th>
+  );
+}
+
+function UserAvatar({ user, size = "normal" }) {
+  const isLarge = size === "large";
+
+  return (
+    <div
+      className={`flex shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+        isLarge ? "h-12 w-12" : "h-9 w-9"
+      } ${
+        user.role === "admin"
+          ? "bg-purple-100 text-purple-700"
+          : "bg-blue-100 text-blue-700"
+      }`}
+    >
+      {user.name?.charAt(0)?.toUpperCase() || "U"}
+    </div>
+  );
+}
+
+function RoleBadge({ role }) {
+  const isAdmin = role === "admin";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold capitalize ${
+        isAdmin
+          ? "bg-purple-100 text-purple-700"
+          : "bg-blue-100 text-blue-700"
+      }`}
+    >
+      {isAdmin && <FaUserShield size={10} />}
+      {role}
+    </span>
+  );
+}
+
+function StatusBadge({ status }) {
+  const isActive = status === "active";
+
+  return (
+    <span
+      className={`inline-flex rounded-full px-3 py-1 text-xs font-bold capitalize ${
+        isActive
+          ? "bg-green-100 text-green-700"
+          : "bg-red-100 text-red-700"
+      }`}
+    >
+      {status}
+    </span>
+  );
+}
+
+function DetailItem({ icon, label, value }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-400">
+        <span>{icon}</span>
+        {label}
+      </div>
+
+      <div className="break-words text-sm font-semibold text-slate-800">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({
+  type = "view",
+  label,
+  icon,
+  disabled = false,
+  onClick,
+  fullWidth = false,
+}) {
+  const styles = {
+    view: "bg-blue-50 text-blue-700 hover:bg-blue-100",
+    role: "bg-purple-50 text-purple-700 hover:bg-purple-100",
+    danger: "bg-red-50 text-red-700 hover:bg-red-100",
+    success: "bg-green-50 text-green-700 hover:bg-green-100",
+  };
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 ${
+        styles[type] || styles.view
+      } ${fullWidth ? "w-full" : ""}`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

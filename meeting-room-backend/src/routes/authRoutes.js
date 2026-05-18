@@ -20,4 +20,17 @@ router.post('/refresh', authController.refreshToken);
 router.post('/logout', authenticate, authController.logout);
 router.get('/profile', authenticate, authController.getProfile);
 
+// ── Forgot Password ───────────────────────────────────────────────────────────
+router.post('/forgot-password',
+  authLimiter,
+  authController.forgotPasswordValidation,
+  authController.forgotPassword
+);
+
+// ── Reset Password ────────────────────────────────────────────────────────────
+router.post('/reset-password',
+  authController.resetPasswordValidation,
+  authController.resetPassword
+);
+
 module.exports = router;
