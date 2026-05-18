@@ -255,6 +255,7 @@ function LoginPage() {
     email: 'Invalid email or password', 
     password: 'Invalid email or password' 
   });
+  setLoading(false);
 }
   } catch {
   showToast('Something went wrong', 'error');
