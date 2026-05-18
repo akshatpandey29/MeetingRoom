@@ -11,7 +11,7 @@ import {
 } from 'react-icons/fa';
 
 function CalendarPage() {
-  const { bookings, cancelBooking, rescheduleBooking, rooms } = useRooms();
+  const { bookings, cancelBooking, rooms } = useRooms();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -63,17 +63,20 @@ function CalendarPage() {
   };
 
   // cancel booking
-  const handleCancel = () => {
+  const handleCancel = async () => {
     const booking = selectedEvent.extendedProps.booking;
     if (!selectedEvent.extendedProps.isOwner) {
       setMessage({ text: 'You can only cancel your own bookings.', type: 'error' });
       return;
     }
     if (window.confirm('Are you sure you want to cancel this booking?')) {
-      cancelBooking(booking.id);
+      const result = await cancelBooking(booking.id);
       setShowModal(false);
       setSelectedEvent(null);
-      setMessage({ text: 'Booking cancelled successfully.', type: 'success' });
+      setMessage({
+        text: result.message || 'Booking cancelled successfully.',
+        type: result.success ? 'success' : 'error',
+      });
     }
   };
 

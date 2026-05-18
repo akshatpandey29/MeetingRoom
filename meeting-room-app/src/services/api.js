@@ -1,69 +1,59 @@
-import axios from 'axios';
+import axios from "axios";
 
-const BASE_URL = 'http://localhost:5000/api';
+const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
 
-// Base URL of your backend server
-// Later change this to your real backend URL
 const api = axios.create({
-    baseURL: BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+  baseURL: BASE_URL,
+  withCredentials: true,
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Request interceptor
-// This runs before every API call automatically
-// It adds the JWT token to every request header
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor
-// This runs after every API response automatically
-// If token expired (401 error), logout user and redirect to login
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/';
+      if (window.location.pathname !== "/") {
+        window.location.href = "/";
+      }
     }
+
     return Promise.reject(error);
   }
 );
 
-/**********Auth API calls ************/
-export const loginUser = async (loginData) =>{
-    const response = await api.post('/auth/login', loginData);
-    return response.data;
+/********** AUTH API CALLS **********/
+
+export const loginUser = async (loginData) => {
+  const response = await api.post("/auth/login", loginData);
+  return response.data;
 };
 
 export const registerUser = async (registerData) => {
-    const response = await api.post('/auth/register', registerData);
-    return response.data;
+  const response = await api.post("/auth/register", registerData);
+  return response.data;
 };
 
-export const logoutUser = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-}
+export const getProfile = async () => {
+  const response = await api.get("/auth/profile");
+  return response.data;
+};
 
-/*****Room API calls****** */
+export const logoutUser = async () => {
+  const response = await api.post("/auth/logout");
+  return response.data;
+};
+
+export const refreshAuthToken = async () => {
+  const response = await api.post("/auth/refresh");
+  return response.data;
+};
+
+/********** ROOM API CALLS **********/
 
 export const getAllRooms = async () => {
-  const response = await api.get('/rooms');
+  const response = await api.get("/rooms");
   return response.data;
 };
 
@@ -73,7 +63,7 @@ export const getRoomById = async (id) => {
 };
 
 export const createRoom = async (roomData) => {
-  const response = await api.post('/rooms', roomData);
+  const response = await api.post("/rooms", roomData);
   return response.data;
 };
 
@@ -87,32 +77,94 @@ export const deleteRoom = async (id) => {
   return response.data;
 };
 
-// ─── BOOKINGS API CALLS ───────────────────────────
+export const toggleRoom = async (id) => {
+  const response = await api.patch(`/rooms/${id}/toggle`);
+  return response.data;
+};
+
+/********** BOOKING API CALLS **********/
 
 export const createBooking = async (bookingData) => {
-  const response = await api.post('/bookings', bookingData);
+  const response = await api.post("/bookings", bookingData);
   return response.data;
 };
 
 export const getUserBookings = async () => {
-  const response = await api.get('/bookings/my');
+  const response = await api.get("/bookings/my");
   return response.data;
 };
 
 export const getAllBookings = async () => {
-  const response = await api.get('/bookings');
+  const response = await api.get("/bookings");
   return response.data;
 };
 
-export const cancelBooking = async (id) => {
-  const response = await api.delete(`/bookings/${id}`);
+export const cancelBooking = async (id, reason = "") => {
+  const response = await api.delete(`/bookings/${id}`, {
+    data: { reason },
+  });
+
   return response.data;
 };
 
-// ─── SLOTS API CALLS ──────────────────────────────
+export const rescheduleBooking = async (id, rescheduleData) => {
+  const response = await api.patch(`/bookings/${id}/reschedule`, rescheduleData);
+  return response.data;
+};
+
+export const getBookingsByRoomAndDate = async (roomId, date) => {
+  const response = await api.get("/bookings/room-date", {
+    params: { roomId, date },
+  });
+
+  return response.data;
+};
 
 export const getAvailableSlots = async (roomId, date) => {
-  const response = await api.get(`/slots?roomId=${roomId}&date=${date}`);
+  const response = await api.get("/bookings/available-slots", {
+    params: { roomId, date },
+  });
+
+  return response.data;
+};
+
+/********** ADMIN API CALLS **********/
+
+export const getAdminStats = async () => {
+  const response = await api.get("/admin/stats");
+  return response.data;
+};
+
+export const getAdminUsers = async () => {
+  const response = await api.get("/admin/users");
+  return response.data;
+};
+
+export const changeAdminUserRole = async (id, role) => {
+  const response = await api.patch(`/admin/users/${id}/role`, { role });
+  return response.data;
+};
+
+export const toggleAdminUserStatus = async (id) => {
+  const response = await api.patch(`/admin/users/${id}/status`);
+  return response.data;
+};
+
+export const getBookingRequests = async () => {
+  const response = await api.get("/admin/booking-requests");
+  return response.data;
+};
+
+export const approveBookingRequest = async (id) => {
+  const response = await api.patch(`/admin/booking-requests/${id}/approve`);
+  return response.data;
+};
+
+export const rejectBookingRequest = async (id, reason = "") => {
+  const response = await api.patch(`/admin/booking-requests/${id}/reject`, {
+    reason,
+  });
+
   return response.data;
 };
 

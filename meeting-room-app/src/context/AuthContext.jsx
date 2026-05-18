@@ -1,5 +1,13 @@
-import { createContext, useContext, useEffect, useState } from "react";
-import { logoutUser } from "../services/api";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  changeAdminUserRole,
+  getAdminUsers,
+  getProfile,
+  loginUser,
+  logoutUser,
+  registerUser,
+  toggleAdminUserStatus,
+} from "../services/api";
 
 const AuthContext = createContext();
 
@@ -7,126 +15,121 @@ export const useAuth = () => {
   return useContext(AuthContext);
 };
 
-const defaultUsers = [
-  {
-    id: 1,
-    name: "Admin",
-    email: "admin@gmail.com",
-    role: "admin",
-    status: "active",
-    createdAt: "2026-05-01",
-  },
-  {
-    id: 2,
-    name: "Rahul",
-    email: "rahul@gmail.com",
-    role: "user",
-    status: "active",
-    createdAt: "2026-05-02",
-  },
-  {
-    id: 3,
-    name: "Priya",
-    email: "priya@gmail.com",
-    role: "user",
-    status: "active",
-    createdAt: "2026-05-03",
-  },
-];
+function getId(value) {
+  if (!value) return "";
+  return String(value._id || value.id || value);
+}
+
+function normalizeUser(user) {
+  if (!user) return null;
+
+  return {
+    ...user,
+    id: getId(user),
+    _id: getId(user),
+    name: user.name || "",
+    email: user.email || "",
+    role: user.role || "user",
+    isActive: user.isActive ?? user.status !== "disabled",
+    status: user.isActive === false || user.status === "disabled" ? "disabled" : "active",
+    createdAt: user.createdAt || "",
+  };
+}
+
+function getErrorMessage(error, fallbackMessage = "Something went wrong.") {
+  return (
+    error?.response?.data?.message ||
+    error?.response?.data?.errors?.[0]?.message ||
+    error?.message ||
+    fallbackMessage
+  );
+}
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const [users, setUsers] = useState(defaultUsers);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
+
+  const saveSessionUser = (nextUser) => {
+    if (!nextUser) {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      setUser(null);
+      setToken(null);
+      return;
+    }
+
+    localStorage.setItem("user", JSON.stringify(nextUser));
+    localStorage.setItem("token", "cookie-session");
+    setUser(nextUser);
+    setToken("cookie-session");
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setUsersLoading(true);
+      const response = await getAdminUsers();
+      const nextUsers = response?.data?.users || [];
+      setUsers(nextUsers.map(normalizeUser).filter(Boolean));
+      return {
+        success: true,
+        message: response?.message || "Users fetched successfully.",
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: getErrorMessage(error, "Users could not be fetched."),
+      };
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const savedToken = localStorage.getItem("token");
-    const savedUsers = localStorage.getItem("users");
+    let isMounted = true;
 
-    let finalUsers = defaultUsers;
-
-    if (savedUsers) {
+    const hydrateSession = async () => {
       try {
-        const parsedUsers = JSON.parse(savedUsers);
+        const response = await getProfile();
+        if (!isMounted) return;
 
-        finalUsers = parsedUsers.map((currentUser) => ({
-          ...currentUser,
-          status: currentUser.status || "active",
-          createdAt:
-            currentUser.createdAt || new Date().toISOString().split("T")[0],
-        }));
+        const currentUser = normalizeUser(response?.data?.user);
+        saveSessionUser(currentUser);
+        setUsers(currentUser ? [currentUser] : []);
       } catch (error) {
-        finalUsers = defaultUsers;
-      }
-    }
+        if (!isMounted) return;
 
-    const activeAdmins = finalUsers.filter(
-      (currentUser) =>
-        currentUser.role === "admin" && currentUser.status !== "disabled"
-    );
-
-    /*
-      Safety repair:
-      If all admins were accidentally changed to users or disabled,
-      restore the default admin account automatically.
-    */
-    if (activeAdmins.length === 0) {
-      const defaultAdmin = defaultUsers[0];
-
-      const adminAlreadyExists = finalUsers.some(
-        (currentUser) => currentUser.email === defaultAdmin.email
-      );
-
-      if (adminAlreadyExists) {
-        finalUsers = finalUsers.map((currentUser) =>
-          currentUser.email === defaultAdmin.email
-            ? {
-                ...currentUser,
-                role: "admin",
-                status: "active",
-              }
-            : currentUser
-        );
-      } else {
-        finalUsers = [defaultAdmin, ...finalUsers];
-      }
-    }
-
-    setUsers(finalUsers);
-    localStorage.setItem("users", JSON.stringify(finalUsers));
-
-    if (savedUser && savedToken) {
-      try {
-        const parsedSavedUser = JSON.parse(savedUser);
-
-        const latestUserData = finalUsers.find(
-          (currentUser) => currentUser.id === parsedSavedUser.id
-        );
-
-        if (latestUserData && latestUserData.status !== "disabled") {
-          setUser(latestUserData);
-          setToken(savedToken);
-          localStorage.setItem("user", JSON.stringify(latestUserData));
-        } else {
-          localStorage.removeItem("user");
-          localStorage.removeItem("token");
+        saveSessionUser(null);
+        setUsers([]);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
         }
-      } catch (error) {
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
       }
-    }
+    };
 
-    setLoading(false);
+    hydrateSession();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!loading) {
-      localStorage.setItem("users", JSON.stringify(users));
+    if (!user) {
+      setUsers([]);
+      return;
     }
-  }, [users, loading]);
+
+    if (user.role === "admin") {
+      fetchUsers();
+      return;
+    }
+
+    setUsers([user]);
+  }, [user]);
 
   const login = async (loginData) => {
     try {
@@ -137,214 +140,137 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      let existingUser = users.find(
-        (currentUser) => currentUser.email === loginData.email
-      );
+      const response = await loginUser(loginData);
+      const loggedInUser = normalizeUser(response?.data?.user);
 
-      if (!existingUser) {
-        existingUser = {
-          id: Date.now(),
-          name: loginData.email.split("@")[0],
-          email: loginData.email,
-          role: loginData.email.includes("admin") ? "admin" : "user",
-          status: "active",
-          createdAt: new Date().toISOString().split("T")[0],
-        };
-
-        setUsers((previousUsers) => [...previousUsers, existingUser]);
-      }
-
-      if (existingUser.status === "disabled") {
+      if (!loggedInUser) {
         return {
           success: false,
-          message: "Your account is disabled. Please contact admin.",
+          message: "Login failed. User data was not returned.",
         };
       }
 
-      const tempToken = "temp-token-" + loginData.email;
+      saveSessionUser(loggedInUser);
+      setUsers([loggedInUser]);
 
-      localStorage.setItem("token", tempToken);
-      localStorage.setItem("user", JSON.stringify(existingUser));
-
-      setToken(tempToken);
-      setUser(existingUser);
+      if (loggedInUser.role === "admin") {
+        fetchUsers();
+      }
 
       return {
         success: true,
-        user: existingUser,
+        user: loggedInUser,
+        message: response?.message || "Login successful",
       };
     } catch (error) {
       return {
         success: false,
-        message: "Login failed",
+        message: getErrorMessage(error, "Login failed"),
       };
     }
   };
 
   const register = async (registerData) => {
     try {
-      const alreadyExists = users.some(
-        (currentUser) => currentUser.email === registerData.email
-      );
+      const response = await registerUser(registerData);
+      const createdUser = normalizeUser(response?.data?.user);
 
-      if (alreadyExists) {
-        return {
-          success: false,
-          message: "User already exists",
-        };
+      if (createdUser) {
+        setUsers((previousUsers) => {
+          const exists = previousUsers.some(
+            (currentUser) => currentUser.id === createdUser.id
+          );
+
+          return exists ? previousUsers : [...previousUsers, createdUser];
+        });
       }
-
-      const newUser = {
-        id: Date.now(),
-        name: registerData.name,
-        email: registerData.email,
-        role: registerData.role || "user",
-        status: "active",
-        createdAt: new Date().toISOString().split("T")[0],
-      };
-
-      setUsers((previousUsers) => [...previousUsers, newUser]);
 
       return {
         success: true,
-        data: newUser,
+        data: createdUser,
+        message: response?.message || "Registration successful",
       };
     } catch (error) {
       return {
         success: false,
-        message: "Registration failed",
+        message: getErrorMessage(error, "Registration failed"),
       };
     }
   };
 
-  const changeUserRole = (userId) => {
-    const targetUser = users.find(
-      (currentUser) => Number(currentUser.id) === Number(userId)
-    );
+  const changeUserRole = async (userId) => {
+    try {
+      if (String(user?.id) === String(userId)) {
+        return {
+          success: false,
+          message: "You cannot change your own admin role.",
+        };
+      }
 
-    if (!targetUser) {
+      const response = await changeAdminUserRole(userId);
+      const updatedUser = normalizeUser(response?.data?.user);
+
+      if (updatedUser) {
+        setUsers((previousUsers) =>
+          previousUsers.map((currentUser) =>
+            currentUser.id === updatedUser.id ? updatedUser : currentUser
+          )
+        );
+      }
+
+      return {
+        success: true,
+        message: response?.message || "User role updated successfully.",
+      };
+    } catch (error) {
       return {
         success: false,
-        message: "User not found.",
+        message: getErrorMessage(error, "User role could not be updated."),
       };
     }
-
-    /*
-      Rule 1:
-      Admin cannot change own role.
-    */
-    if (Number(user?.id) === Number(userId)) {
-      return {
-        success: false,
-        message: "You cannot change your own admin role.",
-      };
-    }
-
-    const activeAdmins = users.filter(
-      (currentUser) =>
-        currentUser.role === "admin" && currentUser.status !== "disabled"
-    );
-
-    /*
-      Rule 3:
-      At least one active admin must always remain.
-    */
-    if (targetUser.role === "admin" && activeAdmins.length <= 1) {
-      return {
-        success: false,
-        message: "At least one active admin must remain in the system.",
-      };
-    }
-
-    const updatedUsers = users.map((currentUser) =>
-      Number(currentUser.id) === Number(userId)
-        ? {
-            ...currentUser,
-            role: currentUser.role === "admin" ? "user" : "admin",
-          }
-        : currentUser
-    );
-
-    setUsers(updatedUsers);
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
-
-    return {
-      success: true,
-      message: "User role updated successfully.",
-    };
   };
 
-  const toggleUserStatus = (userId) => {
-    const targetUser = users.find(
-      (currentUser) => Number(currentUser.id) === Number(userId)
-    );
+  const toggleUserStatus = async (userId) => {
+    try {
+      if (String(user?.id) === String(userId)) {
+        return {
+          success: false,
+          message: "You cannot disable your own account.",
+        };
+      }
 
-    if (!targetUser) {
+      const response = await toggleAdminUserStatus(userId);
+      const updatedUser = normalizeUser(response?.data?.user);
+
+      if (updatedUser) {
+        setUsers((previousUsers) =>
+          previousUsers.map((currentUser) =>
+            currentUser.id === updatedUser.id ? updatedUser : currentUser
+          )
+        );
+      }
+
+      return {
+        success: true,
+        message: response?.message || "User status updated successfully.",
+      };
+    } catch (error) {
       return {
         success: false,
-        message: "User not found.",
+        message: getErrorMessage(error, "User status could not be updated."),
       };
     }
-
-    /*
-      Rule 2:
-      Admin cannot disable own account.
-    */
-    if (
-      Number(user?.id) === Number(userId) &&
-      targetUser.status === "active"
-    ) {
-      return {
-        success: false,
-        message: "You cannot disable your own account.",
-      };
-    }
-
-    const activeAdmins = users.filter(
-      (currentUser) =>
-        currentUser.role === "admin" && currentUser.status !== "disabled"
-    );
-
-    /*
-      Rule 3:
-      At least one active admin must always remain.
-    */
-    if (
-      targetUser.role === "admin" &&
-      targetUser.status === "active" &&
-      activeAdmins.length <= 1
-    ) {
-      return {
-        success: false,
-        message: "At least one active admin must remain in the system.",
-      };
-    }
-
-    const updatedUsers = users.map((currentUser) =>
-      Number(currentUser.id) === Number(userId)
-        ? {
-            ...currentUser,
-            status: currentUser.status === "active" ? "disabled" : "active",
-          }
-        : currentUser
-    );
-
-    setUsers(updatedUsers);
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
-
-    return {
-      success: true,
-      message:
-        targetUser.status === "active"
-          ? "User disabled successfully."
-          : "User enabled successfully.",
-    };
   };
 
-  const logout = () => {
-    logoutUser();
-    setUser(null);
-    setToken(null);
+  const logout = async () => {
+    try {
+      await logoutUser();
+    } catch (error) {
+      // Clear local session even if the server session is already gone.
+    } finally {
+      saveSessionUser(null);
+      setUsers([]);
+    }
   };
 
   const isAdmin = () => {
@@ -352,12 +278,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isLoggedIn = () => {
-    return user !== null && token !== null;
+    return user !== null;
   };
 
-  const admins = users.filter((currentUser) => currentUser.role === "admin");
+  const admins = useMemo(
+    () => users.filter((currentUser) => currentUser.role === "admin"),
+    [users]
+  );
 
-  const normalUsers = users.filter((currentUser) => currentUser.role === "user");
+  const normalUsers = useMemo(
+    () => users.filter((currentUser) => currentUser.role === "user"),
+    [users]
+  );
 
   const value = {
     user,
@@ -366,11 +298,13 @@ export const AuthProvider = ({ children }) => {
     admins,
     normalUsers,
     loading,
+    usersLoading,
     login,
     register,
     logout,
     isAdmin,
     isLoggedIn,
+    fetchUsers,
     changeUserRole,
     toggleUserStatus,
   };
