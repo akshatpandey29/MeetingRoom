@@ -39,6 +39,7 @@ function AdminDashboard() {
     adminRequests,
     bookSlot,
     cancelBooking,
+    deleteBookingFromDatabase,
     rescheduleBooking,
     addRoom,
     updateRoom,
@@ -108,51 +109,74 @@ function AdminDashboard() {
     });
   }
 
-  function handleConfirmModal() {
+  async function handleConfirmModal() {
     const { type, payload } = modalData;
 
     if (type === "cancelBooking") {
-      cancelBooking(payload);
-      showToast("success", "Booking cancelled successfully.");
+      const result = await cancelBooking(payload);
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Booking cancelled successfully."
+      );
+    }
+
+    if (type === "deleteBookingPermanent") {
+      const result = await deleteBookingFromDatabase(payload);
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Booking deleted from database successfully."
+      );
     }
 
     if (type === "deleteRoom") {
-      deleteRoom(payload);
-      showToast("success", "Room deleted successfully.");
+      const result = await deleteRoom(payload);
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Room deactivated successfully."
+      );
     }
 
     if (type === "toggleRoom" || type === "toggleRoomActive") {
-  toggleRoomActive(payload);
-  showToast("success", "Room visibility updated successfully.");
-}
+      const result = await toggleRoomActive(payload);
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Room visibility updated successfully."
+      );
+    }
 
-if (type === "changeRoomStatus") {
-  const selectedRoom = rooms.find(
-    (room) => Number(room.id) === Number(payload)
-  );
+    if (type === "changeRoomStatus") {
+      const selectedRoom = rooms.find(
+        (room) => String(room.id) === String(payload)
+      );
 
-  if (!selectedRoom) {
-    showToast("error", "Room not found.");
-    closeModal();
-    return;
-  }
+      if (!selectedRoom) {
+        showToast("error", "Room not found.");
+        closeModal();
+        return;
+      }
 
-  updateRoom(selectedRoom.id, {
-    ...selectedRoom,
-    status:
-      selectedRoom.status === "available" ? "unavailable" : "available",
-  });
+      const result = await updateRoom(selectedRoom.id, {
+        ...selectedRoom,
+        status:
+          selectedRoom.status === "available" ? "unavailable" : "available",
+      });
 
-  showToast("success", "Room availability status updated successfully.");
-}
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Room availability status updated successfully."
+      );
+    }
 
     if (type === "rejectRequest") {
-      updateAdminRequest(payload.id, "rejected");
-      showToast("success", "Request rejected successfully.");
+      const result = await updateAdminRequest(payload.id, "rejected");
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Request rejected successfully."
+      );
     }
 
     if (type === "approveRequest") {
-      const room = rooms.find((item) => Number(item.id) === Number(payload.roomId));
+      const room = rooms.find((item) => String(item.id) === String(payload.roomId));
 
       if (!room) {
         showToast("error", "Room no longer exists. Request cannot be approved.");
@@ -177,31 +201,15 @@ if (type === "changeRoomStatus") {
         return;
       }
 
-      const slot = `${formatTime(requestStartTime)} - ${formatTime(requestEndTime)}`;
-
-      const result = bookSlot({
-        roomId: room.id,
-        roomName: room.name,
-        date: payload.date,
-        slot,
-        startTime: requestStartTime,
-        endTime: requestEndTime,
-        bookedBy: payload.requestedBy || payload.bookedBy || "Employee",
-        userEmail: payload.userEmail || "",
-      });
-
-      if (!result.success) {
-        showToast("error", result.message || "Request could not be approved.");
-        closeModal();
-        return;
-      }
-
-      updateAdminRequest(payload.id, "approved");
-      showToast("success", "Request approved and booking created successfully.");
+      const result = await updateAdminRequest(payload.id, "approved");
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Request approved and booking created successfully."
+      );
     }
 
     if (type === "changeRole") {
-      const result = changeUserRole(payload);
+      const result = await changeUserRole(payload);
       showToast(
         result?.success === false ? "error" : "success",
         result?.message || "User role updated successfully."
@@ -209,7 +217,7 @@ if (type === "changeRoomStatus") {
     }
 
     if (type === "toggleUser") {
-      const result = toggleUserStatus(payload);
+      const result = await toggleUserStatus(payload);
       showToast(
         result?.success === false ? "error" : "success",
         result?.message || "User status updated successfully."
@@ -388,6 +396,7 @@ function BookingsSection({
   const [viewMode, setViewMode] = useState("list");
 
   const [bookingForm, setBookingForm] = useState({
+    employeeId: "",
     employeeName: "",
     employeeEmail: "",
     roomId: "",
@@ -441,7 +450,7 @@ function BookingsSection({
     const matchesDate = !dateFilter || booking.date === dateFilter;
 
     const matchesRoom =
-      !roomFilter || Number(booking.roomId) === Number(roomFilter);
+      !roomFilter || String(booking.roomId) === String(roomFilter);
 
     const matchesStatus =
       statusFilter === "all" ||
@@ -458,11 +467,12 @@ function BookingsSection({
   });
 
   function handleEmployeeSelect(value) {
-  const selectedUser = users.find((user) => String(user.id) === value);
+  const selectedUser = users.find((user) => String(user.id) === String(value));
 
   if (!selectedUser) {
     setBookingForm((previous) => ({
       ...previous,
+      employeeId: "",
       employeeName: "",
       employeeEmail: "",
     }));
@@ -471,12 +481,13 @@ function BookingsSection({
 
   setBookingForm((previous) => ({
     ...previous,
+    employeeId: selectedUser.id,
     employeeName: selectedUser.name,
     employeeEmail: selectedUser.email,
   }));
 }
 
-  function handleCreateBooking() {
+  async function handleCreateBooking() {
     if (!bookingForm.employeeName.trim()) {
       showToast("error", "Please select or enter employee name.");
       return;
@@ -516,7 +527,7 @@ function BookingsSection({
     }
 
     const selectedRoom = rooms.find(
-      (room) => Number(room.id) === Number(bookingForm.roomId)
+      (room) => String(room.id) === String(bookingForm.roomId)
     );
 
     if (!selectedRoom) {
@@ -545,19 +556,13 @@ function BookingsSection({
       return;
     }
 
-    const slot = `${formatTime(bookingForm.startTime)} - ${formatTime(
-      bookingForm.endTime
-    )}`;
-
-    const result = bookSlot({
+    const result = await bookSlot({
+      userId: bookingForm.employeeId,
       roomId: selectedRoom.id,
-      roomName: selectedRoom.name,
       date: bookingForm.date,
-      slot,
       startTime: bookingForm.startTime,
       endTime: bookingForm.endTime,
-      bookedBy: bookingForm.employeeName,
-      userEmail: bookingForm.employeeEmail,
+      purpose: `Admin booking for ${bookingForm.employeeName} (${bookingForm.employeeEmail})`,
     });
 
     if (!result.success) {
@@ -568,6 +573,7 @@ function BookingsSection({
     showToast("success", "Booking created successfully.");
 
     setBookingForm({
+      employeeId: "",
       employeeName: "",
       employeeEmail: "",
       roomId: "",
@@ -586,7 +592,7 @@ function BookingsSection({
     });
   }
 
-  function saveReschedule(booking) {
+  async function saveReschedule(booking) {
     if (!editData.newDate || !editData.newStartTime || !editData.newEndTime) {
       showToast("error", "Please select date, start time, and end time.");
       return;
@@ -619,13 +625,11 @@ function BookingsSection({
       return;
     }
 
-    const newSlot = `${formatTime(editData.newStartTime)} - ${formatTime(
-      editData.newEndTime
-    )}`;
-
-    const result = rescheduleBooking(booking.id, editData.newDate, newSlot, {
-      startTime: editData.newStartTime,
-      endTime: editData.newEndTime,
+    const result = await rescheduleBooking({
+      bookingId: booking.id,
+      newDate: editData.newDate,
+      newStartTime: editData.newStartTime,
+      newEndTime: editData.newEndTime,
     });
 
     if (!result.success) {
@@ -696,13 +700,7 @@ function BookingsSection({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
             <Field label="User">
               <select
-                value={
-                  users.find(
-                    (user) =>
-                      user.name === bookingForm.employeeName &&
-                      user.email === bookingForm.employeeEmail
-                  )?.id || ""
-                }
+                value={bookingForm.employeeId}
                 onChange={(event) => handleEmployeeSelect(event.target.value)}
                 className="admin-input"
               >
@@ -884,6 +882,17 @@ function BookingsSection({
                     payload: booking.id,
                   })
                 }
+                onDeleteBooking={() =>
+                  openModal({
+                    type: "deleteBookingPermanent",
+                    title: "Delete Booking Record",
+                    message:
+                      "This will permanently delete this booking from the database. This cannot be undone.",
+                    confirmText: "Delete Permanently",
+                    tone: "red",
+                    payload: booking.id,
+                  })
+                }
               />
             ))}
           </div>
@@ -951,7 +960,7 @@ function RequestsSection({
   ).length;
 
   function handleApproveRequest(request) {
-    const room = rooms.find((item) => Number(item.id) === Number(request.roomId));
+    const room = rooms.find((item) => String(item.id) === String(request.roomId));
 
     if (!room) {
       showToast("error", "Room no longer exists. Request cannot be approved.");
@@ -1092,7 +1101,7 @@ function RequestsSection({
             <div className="space-y-3">
               {filteredRequests.map((request) => {
                 const room = rooms.find(
-                  (item) => Number(item.id) === Number(request.roomId)
+                  (item) => String(item.id) === String(request.roomId)
                 );
 
                 const requestStartTime =
@@ -1888,6 +1897,7 @@ function BookingCard({
   onCancelEdit,
   onSave,
   onCancelBooking,
+  onDeleteBooking,
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -1990,8 +2000,17 @@ function BookingCard({
             onClick={onCancelBooking}
             className="admin-action-red"
           >
-            <FaTrash size={13} />
+            <FaTimesCircle size={13} />
             Cancel Booking
+          </button>
+
+          <button
+            type="button"
+            onClick={onDeleteBooking}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.98]"
+          >
+            <FaTrash size={13} />
+            Delete Record
           </button>
         </div>
       )}
@@ -2066,8 +2085,27 @@ function BookingTable({
                     }
                     className="admin-action-red"
                   >
-                    <FaTrash size={13} />
+                    <FaTimesCircle size={13} />
                     Cancel Booking
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openModal({
+                        type: "deleteBookingPermanent",
+                        title: "Delete Booking Record",
+                        message:
+                          "This will permanently delete this booking from the database. This cannot be undone.",
+                        confirmText: "Delete Permanently",
+                        tone: "red",
+                        payload: booking.id,
+                      })
+                    }
+                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.98]"
+                  >
+                    <FaTrash size={13} />
+                    Delete Record
                   </button>
                 </div>
 
@@ -2194,19 +2232,6 @@ function convertTimeToMinutes(timeValue) {
   return hour * 60 + minute;
 }
 
-function formatTime(timeValue) {
-  if (!timeValue) return "";
-
-  const [hour, minute] = timeValue.split(":").map(Number);
-  const period = hour >= 12 ? "PM" : "AM";
-  const displayHour = hour % 12 || 12;
-
-  return `${String(displayHour).padStart(2, "0")}:${String(minute).padStart(
-    2,
-    "0"
-  )} ${period}`;
-}
-
 function getStartFromSlot(slot) {
   if (!slot || !slot.includes("-")) return "";
 
@@ -2271,7 +2296,7 @@ function hasBookingConflict({
       return false;
     }
 
-    if (Number(booking.roomId) !== Number(roomId)) {
+    if (String(booking.roomId) !== String(roomId)) {
       return false;
     }
 

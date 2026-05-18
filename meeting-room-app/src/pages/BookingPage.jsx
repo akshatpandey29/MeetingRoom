@@ -71,7 +71,7 @@ function BookingPage() {
   const { user } = useAuth();
   const {
     getRoomById, getBookingsByRoom, getBookingsByRoomAndDate,
-    bookSlot, cancelBooking, addAdminRequest,
+    fetchBookingsByRoomAndDate, bookSlot, cancelBooking, addAdminRequest,
   } = useRooms();
 
   const selectedRoom = getRoomById(id);
@@ -115,6 +115,13 @@ function BookingPage() {
       }, 200);
     }
   }, [location]);
+
+  useEffect(() => {
+    if (selectedRoom?.id && selectedDate) {
+      fetchBookingsByRoomAndDate(selectedRoom.id, formatDate(selectedDate));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRoom?.id, selectedDate]);
 
   // ── room not found ──────────────────────────────────────────────────────────
   if (!selectedRoom) {
@@ -173,7 +180,7 @@ function BookingPage() {
   }
 
   // ── book slot ───────────────────────────────────────────────────────────────
-  function handleBookSlot() {
+  async function handleBookSlot() {
     if (!selectedDate) { setMessage({ text: "Please select a date.", type: "error" }); return; }
     if (!startTime) { setMessage({ text: "Please select a start time.", type: "error" }); return; }
     if (!endTime) { setMessage({ text: "Please select an end time.", type: "error" }); return; }
@@ -213,7 +220,7 @@ function BookingPage() {
 
     setConflict(false); setConflictDetails(null); setAdminRequestSent(false); setLoading(true);
     const slot = `${formatTime(startTime)} – ${formatTime(endTime)}`;
-    const result = bookSlot({
+    const result = await bookSlot({
       roomId: selectedRoom.id, roomName: selectedRoom.name,
       date: formatDate(selectedDate), slot, startTime, endTime,
       bookedBy: user?.name || "Unknown", userEmail: user?.email || "",
@@ -228,12 +235,12 @@ function BookingPage() {
   }
 
   // ── admin request ───────────────────────────────────────────────────────────
-  function handleAdminRequest() {
+  async function handleAdminRequest() {
     if (!selectedDate || !startTime || !endTime) {
       setMessage({ text: "Please select date and time first.", type: "error" }); return;
     }
     const slot = `${formatTime(startTime)} – ${formatTime(endTime)}`;
-    const result = addAdminRequest({
+    const result = await addAdminRequest({
       roomId: selectedRoom.id, roomName: selectedRoom.name,
       date: formatDate(selectedDate), slot, startTime, endTime,
       requestedBy: user?.name || "Unknown", userEmail: user?.email || "",
@@ -247,11 +254,14 @@ function BookingPage() {
     setShowCancelModal(true);
   }
 
-  function handleConfirmCancelBooking() {
-    cancelBooking(cancelBookingId);
+  async function handleConfirmCancelBooking() {
+    const result = await cancelBooking(cancelBookingId);
     setShowCancelModal(false);
     setCancelBookingId(null);
-    setMessage({ text: "Booking cancelled successfully.", type: "success" });
+    setMessage({
+      text: result.message || "Booking cancelled successfully.",
+      type: result.success ? "success" : "error",
+    });
   }
 
   // ── calendar ────────────────────────────────────────────────────────────────
