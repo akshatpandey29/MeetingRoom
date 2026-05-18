@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const authService = require('../services/authService');
 const ApiResponse = require('../utils/apiResponse');
 const { validateRequest } = require('../middleware/validateRequest');
-const { sendEmail } = require('../services/emailService');
+const { sendPasswordResetEmail, sendEmail } = require('../services/emailService');
 const User = require('../models/userModel');
 const env = require('../config/env');
 
@@ -190,42 +190,11 @@ const forgotPassword = async (req, res, next) => {
     const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}&email=${email}`;
 
     // Send email
-    await sendEmail({
-      to: email,
-      subject: 'RoomBook — Password Reset Request',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-          <div style="background: #0f172a; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-            <h2 style="color: #fff; margin: 0; font-size: 20px;">RoomBook</h2>
-            <p style="color: #94a3b8; margin: 4px 0 0; font-size: 13px;">Meeting Room Scheduler</p>
-          </div>
-          <div style="background: #f8fafc; padding: 32px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0;">
-            <h3 style="color: #0f172a; margin: 0 0 12px;">Reset your password</h3>
-            <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
-              Hello ${user.name},<br/><br/>
-              We received a request to reset your password. Click the button below to set a new password.
-              This link expires in <strong>15 minutes</strong>.
-            </p>
-            <div style="text-align: center; margin: 28px 0;">
-              <a href="${resetUrl}"
-                style="background: #0f172a; color: #fff; padding: 14px 32px; border-radius: 10px;
-                text-decoration: none; font-weight: 600; font-size: 14px; display: inline-block;">
-                Reset Password
-              </a>
-            </div>
-            <p style="color: #94a3b8; font-size: 12px; text-align: center;">
-              If you didn't request this, you can safely ignore this email.<br/>
-              Your password will not change.
-            </p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-            <p style="color: #cbd5e1; font-size: 11px; text-align: center; margin: 0;">
-              © 2026 Plaxonic Technologies · RoomBook
-            </p>
-          </div>
-        </div>
-      `,
-      text: `Hello ${user.name}, reset your password here: ${resetUrl}. This link expires in 15 minutes.`,
-    });
+    await sendPasswordResetEmail({
+  to: email,
+  name: user.name,
+  resetUrl,
+});
 
     return ApiResponse.success(
       res,
