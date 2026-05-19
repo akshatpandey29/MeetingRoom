@@ -142,7 +142,7 @@ function RoomCard({
               title="View schedule"
             >
               <FaEye size={11} />
-              <span className="truncate">Schedule</span>
+              <span className="truncate">Calendar</span>
             </Link>
 
             {canOpenBooking ? (
@@ -255,7 +255,7 @@ function RoomCard({
             className="flex items-center justify-center gap-1.5 text-center bg-slate-100 text-slate-700 text-xs font-semibold py-2 rounded-lg hover:bg-slate-200 transition-colors duration-150"
           >
             <FaEye size={11} />
-            View Schedule
+            View Calendar
           </Link>
 
           {canOpenBooking ? (
