@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 
-function TimePickerWheel({ value, onChange, disabled, label }) {
+function TimePickerWheel({
+  value,
+  onChange,
+  disabled,
+  label,
+  displayMode = "popover",
+}) {
   const hours = ['01','02','03','04','05','06','07','08','09','10','11','12'];
   const minutes = ['00','05','10','15','20','25','30','35','40','45','50','55'];
   const periods = ['AM', 'PM'];
@@ -59,7 +65,7 @@ function TimePickerWheel({ value, onChange, disabled, label }) {
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full px-3 py-2.5 border rounded-xl text-sm text-left transition-all
+        className={`w-full overflow-hidden text-ellipsis whitespace-nowrap px-3 py-2.5 border rounded-xl text-sm text-left transition-all
           ${disabled
             ? 'bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed'
             : 'bg-white border-gray-200 text-slate-800 hover:border-blue-400 cursor-pointer'
@@ -74,7 +80,11 @@ function TimePickerWheel({ value, onChange, disabled, label }) {
 
       {/* Dropdown wheel */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-4 w-56">
+        <div
+          className={`mt-1 z-[70] w-56 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-2xl shadow-xl p-4 ${
+            displayMode === "inline" ? "relative" : "absolute top-full left-0"
+          }`}
+        >
 
           <p className="text-xs font-medium text-slate-500 text-center mb-3">
             Select Time

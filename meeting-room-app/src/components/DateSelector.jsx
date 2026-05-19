@@ -3,7 +3,13 @@ import DatePicker from "react-datepicker";
 import { FaCalendarAlt, FaChevronDown } from "react-icons/fa";
 import "react-datepicker/dist/react-datepicker.css";
 
-function DateSelector({ value, onChange, label = "Date" }) {
+function DateSelector({
+  value,
+  onChange,
+  label = "Date",
+  helper = "",
+  displayMode = "popover",
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -54,6 +60,10 @@ function DateSelector({ value, onChange, label = "Date" }) {
         {label}
       </label>
 
+      {helper && (
+        <p className="mb-3 text-xs text-slate-500">{helper}</p>
+      )}
+
       <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
@@ -74,7 +84,13 @@ function DateSelector({ value, onChange, label = "Date" }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-[78px] z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-3">
+        <div
+          className={`z-50 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 ${
+            displayMode === "inline"
+              ? "relative w-fit max-w-full"
+              : "absolute left-0 top-full"
+          }`}
+        >
           <DatePicker
             selected={selectedDate}
             onChange={(date) => {

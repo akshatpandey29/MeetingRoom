@@ -20,14 +20,14 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
       badge: pendingCount,
     },
     {
-      id: "users",
-      label: "Users",
-      icon: <FaUsers size={13} />,
-    },
-    {
       id: "rooms",
       label: "Rooms",
       icon: <FaDoorOpen size={13} />,
+    },
+    {
+      id: "users",
+      label: "Users",
+      icon: <FaUsers size={13} />,
     },
     {
       id: "reports",

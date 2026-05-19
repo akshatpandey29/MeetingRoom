@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  FaBuilding,
   FaCalendarAlt,
   FaClock,
   FaDoorOpen,
@@ -16,20 +17,42 @@ import TimePickerWheel from "../components/TimePickerWheel";
 import { useRooms } from "../context/RoomContext";
 import { useAuth } from "../context/AuthContext";
 
+const DEFAULT_ROOM_SLOTS = [
+  { start: "09:00", end: "10:00" },
+  { start: "10:00", end: "11:00" },
+  { start: "11:00", end: "12:00" },
+  { start: "12:00", end: "13:00" },
+  { start: "13:00", end: "14:00" },
+  { start: "14:00", end: "15:00" },
+  { start: "15:00", end: "16:00" },
+  { start: "16:00", end: "17:00" },
+];
+
+const CAPACITY_OPTIONS = [
+  { key: "small", label: "1 - 4", minCapacity: 4 },
+  { key: "medium", label: "5 - 10", minCapacity: 10 },
+  { key: "large", label: "11 - 20", minCapacity: 11 },
+  { key: "xlarge", label: "20+", minCapacity: 20 },
+];
+
 function RoomsPage() {
-  const { rooms, bookings, adminRequests } = useRooms();
+  const {
+    rooms,
+    bookings,
+    adminRequests,
+    fetchBookingsByRoomAndDate,
+  } = useRooms();
   const { user } = useAuth();
+  const resultsRef = useRef(null);
 
   const [searchText, setSearchText] = useState("");
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [capacityFilter, setCapacityFilter] = useState("");
-  const [availabilityFilter, setAvailabilityFilter] = useState("available");
+  const [capacityKey, setCapacityKey] = useState("");
+  const [floorFilter, setFloorFilter] = useState("");
   const [viewMode, setViewMode] = useState("grid");
-
-  const [activeDayPreset, setActiveDayPreset] = useState("today");
-  const [activeTimePreset, setActiveTimePreset] = useState("");
+  const [showFormError, setShowFormError] = useState(false);
 
   function getTodayDate() {
     const currentDate = new Date();
@@ -40,21 +63,23 @@ function RoomsPage() {
     return `${year}-${month}-${day}`;
   }
 
-  function getTomorrowDate() {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const year = tomorrow.getFullYear();
-    const month = String(tomorrow.getMonth() + 1).padStart(2, "0");
-    const day = String(tomorrow.getDate()).padStart(2, "0");
-
-    return `${year}-${month}-${day}`;
-  }
-
   function convertTimeToMinutes(timeValue) {
     if (!timeValue) return 0;
 
-    const [hour, minute] = timeValue.split(":").map(Number);
+    const cleanTime = String(timeValue).trim().toUpperCase();
+
+    if (cleanTime.includes("AM") || cleanTime.includes("PM")) {
+      const period = cleanTime.includes("PM") ? "PM" : "AM";
+      const timeOnly = cleanTime.replace("AM", "").replace("PM", "").trim();
+      let [hour, minute] = timeOnly.split(":").map(Number);
+
+      if (period === "PM" && hour !== 12) hour += 12;
+      if (period === "AM" && hour === 12) hour = 0;
+
+      return hour * 60 + (minute || 0);
+    }
+
+    const [hour, minute] = cleanTime.split(":").map(Number);
     return hour * 60 + minute;
   }
 
@@ -71,122 +96,160 @@ function RoomsPage() {
     )} ${period}`;
   }
 
-  function hasTimeConflict(roomId) {
-    if (!selectedDate || !startTime || !endTime) {
-      return false;
-    }
+  function getBookingStartTime(booking) {
+    return booking.startTime || booking.slot?.split("-")[0]?.trim() || "";
+  }
 
-    const newStart = convertTimeToMinutes(startTime);
-    const newEnd = convertTimeToMinutes(endTime);
+  function getBookingEndTime(booking) {
+    return booking.endTime || booking.slot?.split("-")[1]?.trim() || "";
+  }
 
-    return bookings.some((booking) => {
-      if (booking.roomId !== roomId || booking.date !== selectedDate) {
-        return false;
-      }
+  function isActiveBooking(booking) {
+    return booking.status !== "cancelled";
+  }
 
-      if (!booking.startTime || !booking.endTime) {
-        const selectedSlot = `${formatTime(startTime)} - ${formatTime(endTime)}`;
-        return booking.slot === selectedSlot;
-      }
+  function getRoomBookingsForDate(roomId) {
+    return bookings.filter(
+      (booking) =>
+        String(booking.roomId) === String(roomId) &&
+        booking.date === selectedDate &&
+        isActiveBooking(booking)
+    );
+  }
 
-      const existingStart = convertTimeToMinutes(booking.startTime);
-      const existingEnd = convertTimeToMinutes(booking.endTime);
+  function getConflictingBooking(roomId, start = startTime, end = endTime) {
+    if (!selectedDate || !start || !end) return null;
 
-      return newStart < existingEnd && newEnd > existingStart;
-    });
+    const newStart = convertTimeToMinutes(start);
+    const newEnd = convertTimeToMinutes(end);
+
+    return getRoomBookingsForDate(roomId).find((booking) => {
+      const existingStart = getBookingStartTime(booking);
+      const existingEnd = getBookingEndTime(booking);
+
+      if (!existingStart || !existingEnd) return false;
+
+      const bookedStart = convertTimeToMinutes(existingStart);
+      const bookedEnd = convertTimeToMinutes(existingEnd);
+
+      return newStart < bookedEnd && newEnd > bookedStart;
+    }) || null;
   }
 
   function getNextAvailableSlot(roomId) {
-    if (startTime && endTime && !hasTimeConflict(roomId)) {
+    if (
+      startTime &&
+      endTime &&
+      convertTimeToMinutes(endTime) > convertTimeToMinutes(startTime) &&
+      !getConflictingBooking(roomId)
+    ) {
       return `${formatTime(startTime)} - ${formatTime(endTime)}`;
     }
 
-    const defaultSlots = [
-      { start: "09:00", end: "10:00" },
-      { start: "10:00", end: "11:00" },
-      { start: "11:00", end: "12:00" },
-      { start: "12:00", end: "13:00" },
-      { start: "14:00", end: "15:00" },
-      { start: "15:00", end: "16:00" },
-      { start: "16:00", end: "17:00" },
-    ];
+    const roomBookingsForDate = getRoomBookingsForDate(roomId);
 
-    const roomBookingsForDate = bookings.filter(
-      (booking) => booking.roomId === roomId && booking.date === selectedDate
-    );
-
-    const freeSlot = defaultSlots.find((slot) => {
+    const freeSlot = DEFAULT_ROOM_SLOTS.find((slot) => {
       const slotStart = convertTimeToMinutes(slot.start);
       const slotEnd = convertTimeToMinutes(slot.end);
 
       return !roomBookingsForDate.some((booking) => {
-        if (!booking.startTime || !booking.endTime) {
-          return false;
-        }
+        const existingStart = getBookingStartTime(booking);
+        const existingEnd = getBookingEndTime(booking);
 
-        const bookedStart = convertTimeToMinutes(booking.startTime);
-        const bookedEnd = convertTimeToMinutes(booking.endTime);
+        if (!existingStart || !existingEnd) return false;
+
+        const bookedStart = convertTimeToMinutes(existingStart);
+        const bookedEnd = convertTimeToMinutes(existingEnd);
 
         return slotStart < bookedEnd && slotEnd > bookedStart;
       });
     });
 
-    if (!freeSlot) {
-      return "No free slot available";
-    }
+    if (!freeSlot) return "No free slot available";
 
     return `${formatTime(freeSlot.start)} - ${formatTime(freeSlot.end)}`;
   }
 
-  function handleTodayPreset() {
-    setSelectedDate(getTodayDate());
-    setActiveDayPreset("today");
-  }
+  function getSlotStatus(room) {
+    const selectedSlotText =
+      startTime && endTime
+        ? `${formatTime(startTime)} - ${formatTime(endTime)}`
+        : "";
 
-  function handleTomorrowPreset() {
-    setSelectedDate(getTomorrowDate());
-    setActiveDayPreset("tomorrow");
-  }
+    const nextAvailableSlot = getNextAvailableSlot(room.id);
+    const isGenerallyAvailable = room.status === "available" && room.isActive;
 
-  function handleTimePreset(start, end, presetKey) {
-    setStartTime(start);
-    setEndTime(end);
-    setActiveTimePreset(presetKey);
-  }
-
-  function handleDateChange(dateValue) {
-    setSelectedDate(dateValue);
-
-    if (dateValue === getTodayDate()) {
-      setActiveDayPreset("today");
-    } else if (dateValue === getTomorrowDate()) {
-      setActiveDayPreset("tomorrow");
-    } else {
-      setActiveDayPreset("");
+    if (!isGenerallyAvailable) {
+      return {
+        type: "unavailable",
+        label: "Room unavailable",
+        helper: "This room is not open for booking right now.",
+        selectedSlotText,
+        nextAvailableSlot,
+        canBook: false,
+      };
     }
+
+    if (!startTime || !endTime) {
+      return {
+        type: "needs-time",
+        label: "Select a time to check",
+        helper: "Pick start and end time to check this room.",
+        selectedSlotText: "No time selected",
+        nextAvailableSlot,
+        canBook: false,
+      };
+    }
+
+    if (isInvalidTimeRange) {
+      return {
+        type: "invalid",
+        label: "Invalid time range",
+        helper: "End time must be after start time.",
+        selectedSlotText,
+        nextAvailableSlot,
+        canBook: false,
+      };
+    }
+
+    const conflictingBooking = getConflictingBooking(room.id);
+
+    if (conflictingBooking) {
+      const conflictStart = getBookingStartTime(conflictingBooking);
+      const conflictEnd = getBookingEndTime(conflictingBooking);
+      const conflictSlot =
+        conflictingBooking.slot ||
+        `${formatTime(conflictStart)} - ${formatTime(conflictEnd)}`;
+
+      return {
+        type: "booked",
+        label: "Booked for selected time",
+        helper: `Booked: ${conflictSlot}.`,
+        selectedSlotText,
+        nextAvailableSlot,
+        canBook: false,
+      };
+    }
+
+    return {
+      type: "free",
+      label: "Free for selected time",
+      helper: "This room is available for your selected slot.",
+      selectedSlotText,
+      nextAvailableSlot,
+      canBook: true,
+    };
   }
 
   function handleStartTimeChange(time) {
     setStartTime(time);
     setEndTime("");
-    setActiveTimePreset("");
+    setShowFormError(false);
   }
 
   function handleEndTimeChange(time) {
     setEndTime(time);
-
-    const currentStart = startTime;
-    const currentEnd = time;
-
-    if (currentStart === "10:00" && currentEnd === "12:00") {
-      setActiveTimePreset("10-12");
-    } else if (currentStart === "12:00" && currentEnd === "14:00") {
-      setActiveTimePreset("12-2");
-    } else if (currentStart === "14:00" && currentEnd === "17:00") {
-      setActiveTimePreset("2-5");
-    } else {
-      setActiveTimePreset("");
-    }
+    setShowFormError(false);
   }
 
   function clearFilters() {
@@ -194,24 +257,74 @@ function RoomsPage() {
     setSelectedDate(getTodayDate());
     setStartTime("");
     setEndTime("");
-    setCapacityFilter("");
-    setAvailabilityFilter("available");
+    setCapacityKey("");
+    setFloorFilter("");
     setViewMode("grid");
-    setActiveDayPreset("today");
-    setActiveTimePreset("");
+    setShowFormError(false);
   }
 
-  const activeRooms = rooms.filter((room) => room.isActive);
+  function handleShowRooms() {
+    if (isInvalidTimeRange) {
+      setShowFormError(true);
+      return;
+    }
+
+    setShowFormError(false);
+    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  const activeRooms = useMemo(
+    () => rooms.filter((room) => room.isActive),
+    [rooms]
+  );
+
+  const activeRoomIds = useMemo(
+    () => activeRooms.map((room) => room.id).join("|"),
+    [activeRooms]
+  );
+
+  useEffect(() => {
+    if (!selectedDate || activeRooms.length === 0) return;
+
+    activeRooms.forEach((room) => {
+      fetchBookingsByRoomAndDate(room.id, selectedDate);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoomIds, selectedDate]);
+
+  const floorOptions = useMemo(() => {
+    return Array.from(
+      new Set(activeRooms.map((room) => room.location).filter(Boolean))
+    );
+  }, [activeRooms]);
+
+  const selectedCapacity = CAPACITY_OPTIONS.find(
+    (option) => option.key === capacityKey
+  );
+
+  const isInvalidTimeRange =
+    startTime &&
+    endTime &&
+    convertTimeToMinutes(endTime) <= convertTimeToMinutes(startTime);
+
+  const hasCompleteValidSlot = Boolean(startTime && endTime && !isInvalidTimeRange);
+
+  const selectedSlotText =
+    startTime && endTime
+      ? `${formatTime(startTime)} - ${formatTime(endTime)}`
+      : "";
 
   const roomsWithAvailability = activeRooms.map((room) => {
-    const isGenerallyAvailable = room.status === "available" && room.isActive;
-    const isConflict = hasTimeConflict(room.id);
-    const isAvailableForSelectedTime = isGenerallyAvailable && !isConflict;
+    const slotStatus = getSlotStatus(room);
+    const isAvailableForSelectedTime = hasCompleteValidSlot
+      ? slotStatus.canBook
+      : room.status === "available" && room.isActive;
 
     return {
       ...room,
       isAvailableForSelectedTime,
-      nextAvailableSlot: getNextAvailableSlot(room.id),
+      nextAvailableSlot: slotStatus.nextAvailableSlot,
+      slotStatus,
     };
   });
 
@@ -219,33 +332,33 @@ function RoomsPage() {
     const searchValue = searchText.toLowerCase();
 
     const matchesSearch =
+      !searchValue ||
       room.name.toLowerCase().includes(searchValue) ||
       room.location.toLowerCase().includes(searchValue) ||
       room.amenities.some((amenity) =>
         amenity.toLowerCase().includes(searchValue)
       );
 
+    const matchesFloor = !floorFilter || room.location === floorFilter;
+
     const matchesCapacity =
-      !capacityFilter || room.capacity >= Number(capacityFilter);
+      !selectedCapacity || room.capacity >= selectedCapacity.minCapacity;
 
     const matchesAvailability =
-      availabilityFilter === "all" ||
-      (availabilityFilter === "available" && room.isAvailableForSelectedTime) ||
-      (availabilityFilter === "unavailable" &&
-        !room.isAvailableForSelectedTime);
+      !hasCompleteValidSlot || room.isAvailableForSelectedTime;
 
-    return matchesSearch && matchesCapacity && matchesAvailability;
+    return matchesSearch && matchesFloor && matchesCapacity && matchesAvailability;
   });
 
   const bookedTodayCount = bookings.filter(
-    (booking) => booking.date === selectedDate
+    (booking) => booking.date === selectedDate && isActiveBooking(booking)
   ).length;
 
   const myUpcomingBookingsCount = bookings.filter((booking) => {
     const isMyBooking = booking.userEmail === user?.email;
     const isUpcoming = booking.date >= getTodayDate();
 
-    return isMyBooking && isUpcoming;
+    return isMyBooking && isUpcoming && isActiveBooking(booking);
   }).length;
 
   const myPendingRequestsCount = adminRequests.filter((request) => {
@@ -255,19 +368,13 @@ function RoomsPage() {
     return isMyRequest && isPending;
   }).length;
 
-  const availableRoomsCount = roomsWithAvailability.filter(
-    (room) => room.isAvailableForSelectedTime
-  ).length;
-
-  const isInvalidTimeRange = startTime && endTime && endTime <= startTime;
-
   const summaryCards = useMemo(
     () => [
       {
         title: "Available Rooms",
-        value: availableRoomsCount,
+        value: filteredRooms.length,
         icon: <FaDoorOpen />,
-        helper: startTime && endTime ? "For selected time" : "Active now",
+        helper: hasCompleteValidSlot ? "For selected time" : "Active now",
         color: "text-green-600",
         bg: "bg-green-50",
       },
@@ -297,13 +404,12 @@ function RoomsPage() {
       },
     ],
     [
-      availableRoomsCount,
       bookedTodayCount,
-      myUpcomingBookingsCount,
+      filteredRooms.length,
+      hasCompleteValidSlot,
       myPendingRequestsCount,
+      myUpcomingBookingsCount,
       selectedDate,
-      startTime,
-      endTime,
       user,
     ]
   );
@@ -311,7 +417,6 @@ function RoomsPage() {
   return (
     <section className="min-h-screen px-4 md:px-6 py-5 bg-slate-50">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-5">
           <p className="text-xs font-semibold text-blue-600 mb-1.5">
             Meeting Rooms
@@ -322,10 +427,10 @@ function RoomsPage() {
           </h1>
 
           <p className="text-slate-500 mt-1.5 max-w-2xl text-sm">
-            Search and book available rooms for your office meetings.
+            Fill the form, check availability, then book the room that fits.
           </p>
         </div>
-                {/* Quick Summary */}
+
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
           {summaryCards.map((card) => (
             <div
@@ -353,202 +458,173 @@ function RoomsPage() {
           ))}
         </div>
 
-        {/* Booking Preferences */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">
-                Booking Preferences
-              </h2>
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="rounded-t-xl bg-blue-700 px-5 py-4 text-white sm:px-6">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 text-blue-50">
+                  <FaCalendarAlt size={15} />
+                </div>
 
-              <p className="text-xs text-slate-500 mt-0.5">
-                Select a meeting day and preferred office time slot.
-              </p>
-            </div>
-
-            {(activeDayPreset || activeTimePreset) && (
-              <div className="text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full w-fit">
-                Preferences Applied
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <FaCalendarAlt size={12} className="text-blue-500" />
-                <p className="text-xs font-semibold text-slate-700">
-                  Meeting Day
-                </p>
+                <div>
+                  <h2 className="text-base font-bold leading-tight">
+                    Room Availability
+                  </h2>
+                  <p className="mt-1 text-xs font-medium text-blue-100">
+                    Pick a meeting slot, match capacity, then continue with the room that fits.
+                  </p>
+                </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                <QuickPresetButton
-                  label="Today"
-                  active={activeDayPreset === "today"}
-                  onClick={handleTodayPreset}
-                />
-
-                <QuickPresetButton
-                  label="Tomorrow"
-                  active={activeDayPreset === "tomorrow"}
-                  onClick={handleTomorrowPreset}
-                />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <FaClock size={12} className="text-blue-500" />
-                <p className="text-xs font-semibold text-slate-700">
-                  Preferred Time Slot
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <QuickPresetButton
-                  label="Morning"
-                  time="10 AM - 12 PM"
-                  active={activeTimePreset === "10-12"}
-                  onClick={() => handleTimePreset("10:00", "12:00", "10-12")}
-                />
-
-                <QuickPresetButton
-                  label="Midday"
-                  time="12 PM - 2 PM"
-                  active={activeTimePreset === "12-2"}
-                  onClick={() => handleTimePreset("12:00", "14:00", "12-2")}
-                />
-
-                <QuickPresetButton
-                  label="Afternoon"
-                  time="2 PM - 5 PM"
-                  active={activeTimePreset === "2-5"}
-                  onClick={() => handleTimePreset("14:00", "17:00", "2-5")}
-                />
+              <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-blue-50">
+                <span className="rounded-full bg-white/15 px-3 py-1">
+                  1. Date & time
+                </span>
+                <span className="rounded-full bg-white/15 px-3 py-1">
+                  2. Capacity
+                </span>
+                <span className="rounded-full bg-white/15 px-3 py-1">
+                  3. Available rooms
+                </span>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Filters */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-            <DateSelector
-              value={selectedDate}
-              onChange={handleDateChange}
-              label="Date"
-            />
-
-            <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 mb-1.5">
-                <FaClock className="text-blue-500" size={12} />
-                Start Time
-              </label>
-
-              <TimePickerWheel
-                value={startTime}
-                onChange={handleStartTimeChange}
-                disabled={false}
-                label="Select start time"
+          <div className="px-5 py-5 sm:px-6">
+            <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <DateSelector
+                value={selectedDate}
+                onChange={(date) => {
+                  setSelectedDate(date);
+                  setShowFormError(false);
+                }}
+                label="Date"
               />
-            </div>
 
-            <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 mb-1.5">
-                <FaClock className="text-blue-500" size={12} />
-                End Time
-              </label>
-
-              <TimePickerWheel
-                value={endTime}
-                onChange={handleEndTimeChange}
-                disabled={!startTime}
-                label="Select end time"
-              />
-            </div>
-
-            <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 mb-1.5">
-                <FaUsers className="text-blue-500" size={12} />
-                Capacity
-              </label>
-
-              <select
-                value={capacityFilter}
-                onChange={(event) => setCapacityFilter(event.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              <CompactField
+                icon={<FaClock className="text-blue-500" size={13} />}
+                label="Start Time"
               >
-                <option value="">Any Capacity</option>
-                <option value="4">4+ people</option>
-                <option value="6">6+ people</option>
-                <option value="10">10+ people</option>
-                <option value="15">15+ people</option>
-                <option value="20">20+ people</option>
-              </select>
-            </div>
+                <TimePickerWheel
+                  value={startTime}
+                  onChange={handleStartTimeChange}
+                  disabled={false}
+                  label="Select start time"
+                />
+              </CompactField>
 
-            <div>
-              <label className="flex items-center gap-2 text-xs font-medium text-slate-700 mb-1.5">
-                <FaSearch className="text-blue-500" size={12} />
-                Search Room
-              </label>
-
-              <input
-                type="text"
-                placeholder="Room, floor, amenity..."
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <select
-                value={availabilityFilter}
-                onChange={(event) => setAvailabilityFilter(event.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              <CompactField
+                icon={<FaClock className="text-blue-500" size={13} />}
+                label="End Time"
               >
-                <option value="available">Available Rooms</option>
-                <option value="all">All Active Rooms</option>
-                <option value="unavailable">
-                  Unavailable for Selected Time
-                </option>
-              </select>
+                <TimePickerWheel
+                  value={endTime}
+                  onChange={handleEndTimeChange}
+                  disabled={!startTime}
+                  label="Select end time"
+                />
+              </CompactField>
 
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="px-3 py-2 text-sm font-medium text-slate-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              <CompactField
+                icon={<FaBuilding className="text-blue-500" size={13} />}
+                label="Floor"
               >
-                Clear Filters
-              </button>
+                <select
+                  value={floorFilter}
+                  onChange={(event) => setFloorFilter(event.target.value)}
+                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                >
+                  <option value="">Any floor</option>
+                  {floorOptions.map((floor) => (
+                    <option key={floor} value={floor}>
+                      {floor}
+                    </option>
+                  ))}
+                </select>
+              </CompactField>
+
+              <div className="xl:col-span-2">
+                <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <FaUsers className="text-blue-500" size={13} />
+                  Capacity
+                </label>
+
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {CAPACITY_OPTIONS.map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() =>
+                        setCapacityKey((currentKey) =>
+                          currentKey === option.key ? "" : option.key
+                        )
+                      }
+                      className={`min-h-11 rounded-lg border px-3 py-2 text-xs font-bold transition-all ${
+                        capacityKey === option.key
+                          ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <CompactField
+                icon={<FaSearch className="text-blue-500" size={13} />}
+                label="Room or Amenity"
+                className="xl:col-span-2"
+              >
+                <input
+                  type="text"
+                  placeholder="Projector, whiteboard, room name..."
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+              </CompactField>
             </div>
 
-            {isInvalidTimeRange && (
-              <p className="text-xs font-medium text-red-600">
+            {(isInvalidTimeRange || showFormError) && (
+              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
                 End time must be after start time.
               </p>
             )}
+
+            <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={handleShowRooms}
+                className="min-h-11 flex-1 rounded-lg bg-blue-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              >
+                Show Available Rooms
+              </button>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="min-h-11 rounded-lg px-5 py-2.5 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-200"
+              >
+                Clear
+              </button>
+
+            </div>
           </div>
         </div>
 
-
-        {/* Rooms Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <div
+          ref={resultsRef}
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 scroll-mt-24"
+        >
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
-              Available Rooms
+              {hasCompleteValidSlot ? "Available Rooms" : "Matching Rooms"}
             </h2>
 
             <p className="text-xs text-slate-500 mt-0.5">
               Showing {filteredRooms.length} room
               {filteredRooms.length !== 1 ? "s" : ""}
-              {startTime && endTime
-                ? ` for ${formatTime(startTime)} - ${formatTime(endTime)}`
-                : ""}
+              {selectedSlotText ? ` for ${selectedSlotText}` : ""}
             </p>
           </div>
 
@@ -581,7 +657,6 @@ function RoomsPage() {
           </div>
         </div>
 
-        {/* Rooms */}
         {filteredRooms.length > 0 ? (
           <div
             key={viewMode}
@@ -607,6 +682,7 @@ function RoomsPage() {
                   endTime={endTime}
                   nextAvailableSlot={room.nextAvailableSlot}
                   isAvailableForSelectedTime={room.isAvailableForSelectedTime}
+                  slotStatus={room.slotStatus}
                 />
               </div>
             ))}
@@ -618,7 +694,7 @@ function RoomsPage() {
             </h3>
 
             <p className="text-slate-500 text-sm">
-              Try changing your date, time, capacity, or search filter.
+              Try changing the date, time, team size, floor, or room preference.
             </p>
           </div>
         )}
@@ -642,29 +718,15 @@ function RoomsPage() {
   );
 }
 
-function QuickPresetButton({ label, time, active, onClick }) {
+function CompactField({ icon, label, className = "", children }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`min-w-[92px] px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-200 text-left ${
-        active
-          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
-          : "bg-white text-slate-700 border-gray-200 hover:border-blue-300 hover:text-blue-700 hover:bg-blue-50"
-      }`}
-    >
-      <span className="block leading-tight">{label}</span>
-
-      {time && (
-        <span
-          className={`block text-[10px] mt-0.5 ${
-            active ? "text-blue-100" : "text-slate-400"
-          }`}
-        >
-          {time}
-        </span>
-      )}
-    </button>
+    <div className={className}>
+      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+        {icon}
+        {label}
+      </label>
+      {children}
+    </div>
   );
 }
 

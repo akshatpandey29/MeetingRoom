@@ -106,13 +106,18 @@ function BookingPage() {
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
+    if (location.state?.selectedDate) setSelectedDate(convertDateStringToDate(location.state.selectedDate));
+    if (location.state?.startTime) setStartTime(location.state.startTime);
+    if (location.state?.endTime) setEndTime(location.state.endTime);
+
     if (location.state?.openCalendar || location.hash === "#calendar") {
-      if (location.state?.selectedDate) setSelectedDate(convertDateStringToDate(location.state.selectedDate));
-      if (location.state?.startTime) setStartTime(location.state.startTime);
-      if (location.state?.endTime) setEndTime(location.state.endTime);
       setTimeout(() => {
         document.getElementById("calendar")?.scrollIntoView({ behavior: "smooth", block: "start" });
       }, 200);
+    } else if (location.state?.openBookingForm) {
+      setTimeout(() => {
+        document.getElementById("booking-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 100);
     }
   }, [location]);
 
@@ -373,7 +378,7 @@ function BookingPage() {
         )}
 
         {/* ── Page Header ── */}
-        <div className="mb-6">
+        <div id="booking-form" className="mb-6 scroll-mt-24">
           <button onClick={() => navigate("/rooms")}
             className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 mb-4 transition-colors font-medium">
             <FaArrowLeft size={10} /> Back to Rooms

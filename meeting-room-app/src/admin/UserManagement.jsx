@@ -12,6 +12,8 @@ import {
   FaCalendarAlt,
   FaUser,
   FaUsers,
+  FaThLarge,
+  FaList,
 } from "react-icons/fa";
 import { useAuth } from "../context/AuthContext";
 import ConfirmModal from "../components/ConfirmModal";
@@ -21,6 +23,8 @@ function UserManagement() {
 
   const [userSearch, setUserSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [viewMode, setViewMode] = useState("list");
+  const [userPage, setUserPage] = useState(1);
   const [selectedUser, setSelectedUser] = useState(null);
 
   const [message, setMessage] = useState({
@@ -179,6 +183,23 @@ function UserManagement() {
     (currentUser) => currentUser.status === "active"
   ).length;
 
+  const usersPerPage = viewMode === "grid" ? 6 : 8;
+  const totalUserPages = Math.max(
+    1,
+    Math.ceil(filteredUsers.length / usersPerPage)
+  );
+  const currentUserPage = Math.min(userPage, totalUserPages);
+  const userStartIndex = (currentUserPage - 1) * usersPerPage;
+  const paginatedUsers = filteredUsers.slice(
+    userStartIndex,
+    userStartIndex + usersPerPage
+  );
+  const userShowingStart = filteredUsers.length === 0 ? 0 : userStartIndex + 1;
+  const userShowingEnd = Math.min(
+    userStartIndex + usersPerPage,
+    filteredUsers.length
+  );
+
   const handleViewUser = (currentUser) => {
     setSelectedUser(currentUser);
   };
@@ -226,6 +247,7 @@ function UserManagement() {
   const clearFilters = () => {
     setUserSearch("");
     setRoleFilter("all");
+    setUserPage(1);
   };
 
   return (
@@ -253,18 +275,28 @@ function UserManagement() {
       )}
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-5">
-          <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
-            Users
-          </p>
+        <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="mb-1 text-xs font-bold uppercase tracking-[0.14em] text-blue-600">
+              Users
+            </p>
 
-          <h2 className="text-xl font-bold text-slate-900">
-            User Management
-          </h2>
+            <h2 className="text-xl font-bold text-slate-900">
+              User Management
+            </h2>
 
-          <p className="mt-1 text-sm leading-6 text-slate-500">
-            View employees, manage roles, and control account access.
-          </p>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              View employees, manage roles, and control account access.
+            </p>
+          </div>
+
+          <UserViewToggle
+            viewMode={viewMode}
+            setViewMode={(nextViewMode) => {
+              setViewMode(nextViewMode);
+              setUserPage(1);
+            }}
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -333,14 +365,20 @@ function UserManagement() {
                 type="text"
                 placeholder="Search by name or email..."
                 value={userSearch}
-                onChange={(event) => setUserSearch(event.target.value)}
+                onChange={(event) => {
+                  setUserSearch(event.target.value);
+                  setUserPage(1);
+                }}
                 className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-10 pr-4 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
               />
             </div>
 
             <select
               value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
+              onChange={(event) => {
+                setRoleFilter(event.target.value);
+                setUserPage(1);
+              }}
               className="h-11 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-50"
             >
               <option value="all">All Roles</option>
@@ -356,10 +394,31 @@ function UserManagement() {
               Clear
             </button>
           </div>
+
+          <p className="mt-4 text-sm font-medium text-slate-500">
+            Showing {userShowingStart}-{userShowingEnd} of{" "}
+            {filteredUsers.length} filtered users.
+          </p>
         </div>
 
         {filteredUsers.length > 0 ? (
           <>
+            {viewMode === "grid" ? (
+              <div className="grid grid-cols-1 gap-4 p-5 xl:grid-cols-2">
+                {paginatedUsers.map((currentUser) => (
+                  <UserGridCard
+                    key={currentUser.id}
+                    currentUser={currentUser}
+                    loggedInUser={user}
+                    formatUserDate={formatUserDate}
+                    onView={handleViewUser}
+                    onChangeRole={handleChangeRoleClick}
+                    onToggleStatus={handleToggleStatusClick}
+                  />
+                ))}
+              </div>
+            ) : (
+              <>
             <div className="hidden overflow-x-auto lg:block">
               <table className="w-full text-sm">
                 <thead className="border-b border-slate-100 bg-slate-50">
@@ -374,7 +433,7 @@ function UserManagement() {
                 </thead>
 
                 <tbody className="divide-y divide-slate-100">
-                  {filteredUsers.map((currentUser) => {
+                  {paginatedUsers.map((currentUser) => {
                     const isCurrentLoggedInUser = currentUser.id === user?.id;
 
                     return (
@@ -468,7 +527,7 @@ function UserManagement() {
             </div>
 
             <div className="divide-y divide-slate-100 lg:hidden">
-              {filteredUsers.map((currentUser) => {
+              {paginatedUsers.map((currentUser) => {
                 const isCurrentLoggedInUser = currentUser.id === user?.id;
 
                 return (
@@ -544,6 +603,16 @@ function UserManagement() {
                 );
               })}
             </div>
+              </>
+            )}
+
+            {filteredUsers.length > usersPerPage && (
+              <UserPaginationControls
+                currentPage={currentUserPage}
+                totalPages={totalUserPages}
+                onPageChange={setUserPage}
+              />
+            )}
           </>
         ) : (
           <div className="flex min-h-[240px] items-center justify-center px-6 py-10 text-center">
@@ -570,6 +639,176 @@ function UserManagement() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function UserViewToggle({ viewMode, setViewMode }) {
+  return (
+    <div className="inline-flex w-fit rounded-xl bg-slate-100 p-1">
+      <button
+        type="button"
+        onClick={() => setViewMode("grid")}
+        className={`flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${
+          viewMode === "grid"
+            ? "bg-white text-blue-600 shadow-sm"
+            : "text-slate-500 hover:text-slate-900"
+        }`}
+      >
+        <FaThLarge size={13} />
+        Grid
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setViewMode("list")}
+        className={`flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold transition ${
+          viewMode === "list"
+            ? "bg-white text-blue-600 shadow-sm"
+            : "text-slate-500 hover:text-slate-900"
+        }`}
+      >
+        <FaList size={13} />
+        List
+      </button>
+    </div>
+  );
+}
+
+function UserPaginationControls({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-slate-500">
+        Page {currentPage} of {totalPages}
+      </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+        >
+          Previous
+        </button>
+
+        {pageNumbers.map((pageNumber) => (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onPageChange(pageNumber)}
+            className={`h-9 min-w-9 rounded-xl px-3 text-sm font-semibold transition ${
+              currentPage === pageNumber
+                ? "bg-blue-600 text-white shadow-sm"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {pageNumber}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function UserGridCard({
+  currentUser,
+  loggedInUser,
+  formatUserDate,
+  onView,
+  onChangeRole,
+  onToggleStatus,
+}) {
+  const isCurrentLoggedInUser = currentUser.id === loggedInUser?.id;
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <UserAvatar user={currentUser} />
+
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate font-bold text-slate-900">
+                {currentUser.name}
+              </h3>
+              <RoleBadge role={currentUser.role} />
+            </div>
+
+            <p className="mt-1 break-all text-sm text-slate-500">
+              {currentUser.email}
+            </p>
+
+            {isCurrentLoggedInUser && (
+              <p className="mt-1 text-xs font-semibold text-blue-600">
+                Current admin
+              </p>
+            )}
+          </div>
+        </div>
+
+        <StatusBadge status={currentUser.status} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl bg-slate-50 p-3 sm:grid-cols-2">
+        <DetailItem
+          icon={<FaCalendarAlt />}
+          label="Created"
+          value={formatUserDate(currentUser.createdAt)}
+        />
+        <DetailItem
+          icon={<FaUserShield />}
+          label="Access"
+          value={currentUser.role === "admin" ? "Admin" : "User"}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <ActionButton
+          type="view"
+          label="View"
+          icon={<FaEye size={11} />}
+          onClick={() => onView(currentUser)}
+          fullWidth
+        />
+
+        <ActionButton
+          type="role"
+          label="Change Role"
+          icon={<FaUserShield size={11} />}
+          disabled={isCurrentLoggedInUser}
+          onClick={() => onChangeRole(currentUser)}
+          fullWidth
+        />
+
+        <ActionButton
+          type={currentUser.status === "active" ? "danger" : "success"}
+          label={currentUser.status === "active" ? "Disable" : "Enable"}
+          icon={
+            currentUser.status === "active" ? (
+              <FaUserSlash size={11} />
+            ) : (
+              <FaUserCheck size={11} />
+            )
+          }
+          disabled={isCurrentLoggedInUser}
+          onClick={() => onToggleStatus(currentUser)}
+          fullWidth
+        />
       </div>
     </div>
   );
