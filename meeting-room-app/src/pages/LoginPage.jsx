@@ -93,6 +93,7 @@ function LoginPage() {
   const [activeTab, setActiveTab] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [loginData, setLoginData] = useState({ email:'', password:'' });
   const [loginErrors, setLoginErrors] = useState({});
   const [regData, setRegData] = useState({ name:'', email:'', password:'' });
@@ -180,7 +181,7 @@ function LoginPage() {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      setLoading(true);
+      setGoogleLoading(true);
       const response = await api.post('/auth/google', { credential: credentialResponse.credential });
       if(response.data?.success) {
         const { user, accessToken, refreshToken } = response.data.data;
@@ -192,13 +193,13 @@ function LoginPage() {
   window.location.href = user.role==='admin' ? '/admin' : '/rooms';
 }, 1500);
       } else {
-        showToast(response.data?.message||'Google login failed','error');
-        setLoading(false);
-      }
-    } catch(error) {
-      showToast(error.response?.data?.message||'Google login failed','error');
-      setLoading(false);
-    }
+  showToast(response.data?.message||'Google login failed','error');
+  setGoogleLoading(false);
+}
+} catch(error) {
+  showToast(error.response?.data?.message||'Google login failed','error');
+  setGoogleLoading(false);
+}
   };
 
   const handleGoogleError = () => showToast('Google sign in was cancelled or failed','error');

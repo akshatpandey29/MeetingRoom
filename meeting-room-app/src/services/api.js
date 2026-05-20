@@ -25,8 +25,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-  const isLogoutRequest = error.config?.url?.includes('/auth/logout');
-  if (error.response && error.response.status === 401 && !isLogoutRequest) {
+  const url = error.config?.url || '';
+  const isAuthRequest = url.includes('/auth/logout') || url.includes('/auth/profile');
+  if (error.response && error.response.status === 401 && !isAuthRequest) {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
