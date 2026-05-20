@@ -110,12 +110,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── LOGOUT ──────────────────────────────────────────────────────────────────
-  const logout = () => {
+  const logout = async () => {
+  try {
+    await api.post('/auth/logout');
+  } catch {
+    // ignore error
+  } finally {
     logoutUser();
     setUser(null);
     setToken(null);
     setUsers([]);
-  };
+  }
+};
 
   // ── UPDATE PROFILE ──────────────────────────────────────────────────────────
   const updateProfile = async ({ name }) => {

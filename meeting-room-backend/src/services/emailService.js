@@ -1,34 +1,51 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
+const env = require('../config/env');
 const logger = require('../utils/logger');
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-const FROM_EMAIL = 'onboarding@resend.dev';
 const APP_NAME = 'RoomBook';
+
+// ── Create transporter ────────────────────────────────────────────────────────
+const createTransporter = () => {
+  if (!env.email?.user || !env.email?.pass || env.email.user === 'your@email.com') {
+    return null;
+  }
+
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: env.email.user,
+      pass: env.email.pass,
+    },
+  });
+};
 
 // ── Send Email ────────────────────────────────────────────────────────────────
 const sendEmail = async ({ to, subject, html, text }) => {
   try {
-    if (!process.env.RESEND_API_KEY) {
-      logger.warn('RESEND_API_KEY not configured. Email not sent.', { to, subject });
+    const transporter = createTransporter();
+
+    if (!transporter) {
+      logger.warn('Email service not configured. Email not sent.', { to, subject });
       return { success: false, message: 'Email service not configured.' };
     }
 
-    const { data, error } = await resend.emails.send({
-      from: `${APP_NAME} <${FROM_EMAIL}>`,
+    const mailOptions = {
+      from: `"${APP_NAME}" <${env.email.user}>`,
       to,
       subject,
       html,
       text,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    logger.info('Email sent successfully', {
+      to,
+      subject,
+      messageId: info.messageId,
     });
 
-    if (error) {
-      logger.error('Resend email error:', error);
-      return { success: false, message: error.message };
-    }
-
-    logger.info('Email sent successfully', { to, subject, id: data?.id });
-    return { success: true, message: 'Email sent successfully.', data };
+    return { success: true, message: 'Email sent successfully.', data: info };
 
   } catch (error) {
     logger.error('Email sending failed:', error);
@@ -59,7 +76,7 @@ const sendWelcomeEmail = async ({ to, name }) => {
         </div>
       </div>
     `,
-    text: `Welcome, ${name}! Your account has been created successfully. You can now log in and book meeting rooms.`,
+    text: `Welcome, ${name}! Your account has been created successfully.`,
   });
 };
 
@@ -67,7 +84,7 @@ const sendWelcomeEmail = async ({ to, name }) => {
 const sendBookingConfirmationEmail = async ({ to, name, roomName, date, startTime, endTime }) => {
   return sendEmail({
     to,
-    subject: 'Booking Confirmed — RoomBook',
+    subject: `Booking Confirmed — ${APP_NAME}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
         <div style="background: #0f172a; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -97,7 +114,7 @@ const sendBookingConfirmationEmail = async ({ to, name, roomName, date, startTim
 const sendBookingCancellationEmail = async ({ to, name, roomName, date, startTime, endTime }) => {
   return sendEmail({
     to,
-    subject: 'Booking Cancelled — RoomBook',
+    subject: `Booking Cancelled — ${APP_NAME}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
         <div style="background: #0f172a; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -128,7 +145,9 @@ const sendBookingRequestStatusEmail = async ({ to, name, status, roomName, date,
   const isApproved = status === 'approved';
   return sendEmail({
     to,
-    subject: isApproved ? 'Booking Request Approved — RoomBook' : 'Booking Request Rejected — RoomBook',
+    subject: isApproved
+      ? `Booking Request Approved — ${APP_NAME}`
+      : `Booking Request Rejected — ${APP_NAME}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
         <div style="background: #0f172a; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
@@ -161,7 +180,7 @@ const sendBookingRequestStatusEmail = async ({ to, name, status, roomName, date,
 const sendPasswordResetEmail = async ({ to, name, resetUrl }) => {
   return sendEmail({
     to,
-    subject: 'Reset Your Password — RoomBook',
+    subject: `Reset Your Password — ${APP_NAME}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
         <div style="background: #0f172a; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">

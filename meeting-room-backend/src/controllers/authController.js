@@ -145,11 +145,12 @@ const forgotPassword = async (req, res, next) => {
     const resetUrl = `http://localhost:3000/reset-password?token=${resetToken}&email=${email}`;
 
     // Send email
-    await sendPasswordResetEmail({
+   const emailResult = await sendPasswordResetEmail({
   to: email,
   name: user.name,
   resetUrl,
 });
+console.log('Email result:', emailResult);
 
     return ApiResponse.success(
       res,
