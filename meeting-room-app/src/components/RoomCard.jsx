@@ -1,11 +1,10 @@
 import { Link } from "react-router-dom";
 import {
+  FaBell,
   FaCalendarAlt,
-  FaCheckCircle,
   FaClock,
   FaEye,
   FaMapMarkerAlt,
-  FaTimesCircle,
   FaUsers,
 } from "react-icons/fa";
 
@@ -17,35 +16,52 @@ function RoomCard({
   endTime,
   nextAvailableSlot,
   isAvailableForSelectedTime,
+  slotStatus,
 }) {
   const isRoomActiveAndAvailable = room.status === "available" && room.isActive;
-  const canBook = isRoomActiveAndAvailable && isAvailableForSelectedTime;
+  const fallbackCanBook =
+    isRoomActiveAndAvailable && isAvailableForSelectedTime && startTime && endTime;
 
+  const resolvedSlotStatus =
+    slotStatus ||
+    {
+      type: fallbackCanBook ? "free" : "needs-time",
+      label: fallbackCanBook ? "Available" : "Select a time",
+      helper: fallbackCanBook
+        ? "This room is available for your selected slot."
+        : "Select start and end time to check this room.",
+      selectedSlotText:
+        startTime && endTime
+          ? `${formatTime(startTime)} - ${formatTime(endTime)}`
+          : "No time selected",
+      nextAvailableSlot,
+      canBook: Boolean(fallbackCanBook),
+    };
+
+  const canOpenBooking =
+    isRoomActiveAndAvailable && Boolean(resolvedSlotStatus.canBook);
+  const canRequestAdmin = resolvedSlotStatus.type === "booked";
   const selectedTimeText =
-    startTime && endTime
+    resolvedSlotStatus.selectedSlotText ||
+    (startTime && endTime
       ? `${formatTime(startTime)} - ${formatTime(endTime)}`
-      : "No time selected";
-
-  function formatTime(timeValue) {
-    if (!timeValue) return "";
-
-    const [hour, minute] = timeValue.split(":").map(Number);
-    const period = hour >= 12 ? "PM" : "AM";
-    const displayHour = hour % 12 || 12;
-
-    return `${String(displayHour).padStart(2, "0")}:${String(minute).padStart(
-      2,
-      "0"
-    )} ${period}`;
-  }
+      : "No time selected");
 
   const scheduleLink = {
     pathname: `/book/${room.id}`,
     hash: "#calendar",
   };
 
-  const bookRoomLink = {
-    pathname: `/book/${room.id}`,
+  const bookingLink = `/book/${room.id}`;
+  const bookingState = {
+    selectedDate,
+    startTime,
+    endTime,
+    openBookingForm: true,
+  };
+  const requestAdminState = {
+    ...bookingState,
+    requestAdmin: true,
   };
 
   if (viewMode === "list") {
@@ -65,11 +81,11 @@ function RoomCard({
                 </div>
               </div>
 
-              <StatusBadge canBook={canBook} />
+              <StatusBadge status={resolvedSlotStatus.type} />
             </div>
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <div className="flex items-center gap-1.5 text-xs text-slate-700">
               <FaUsers size={12} className="text-blue-500" />
               <span>
@@ -78,7 +94,7 @@ function RoomCard({
             </div>
           </div>
 
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-2">
             <div className="flex flex-wrap gap-1.5">
               {room.amenities.slice(0, 4).map((amenity, index) => (
                 <span
@@ -97,20 +113,25 @@ function RoomCard({
             </div>
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3">
             <div className="flex items-start gap-1.5 text-xs text-slate-600">
               <FaClock size={12} className="text-blue-500 mt-0.5" />
 
               <div>
-                <p className="font-medium text-slate-700">Next Slot</p>
+                <p className="font-medium text-slate-700">
+                  {resolvedSlotStatus.label}
+                </p>
                 <p className="text-[11px] text-slate-500">
-                  {nextAvailableSlot}
+                  {selectedTimeText}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Next: {resolvedSlotStatus.nextAvailableSlot || nextAvailableSlot}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="lg:col-span-2 flex flex-col sm:flex-row lg:justify-end gap-2">
+          <div className="lg:col-span-3 grid grid-cols-2 gap-1.5 lg:justify-end">
             <Link
               to={scheduleLink}
               state={{
@@ -119,30 +140,41 @@ function RoomCard({
                 startTime,
                 endTime,
               }}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-2 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+              title="View schedule"
             >
               <FaEye size={11} />
-               Schedule
+              <span className="truncate">Calendar</span>
             </Link>
 
-            {canBook ? (
+            {canOpenBooking ? (
               <Link
-                to={bookRoomLink}
-                state={{
-                  openCalendar: false,
-                  resetBookingForm: true,
-                }}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                to={bookingLink}
+                state={bookingState}
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700"
+                title="Book room"
               >
                 <FaCalendarAlt size={11} />
-                Book 
+                <span className="truncate">Book Room</span>
+              </Link>
+            ) : canRequestAdmin ? (
+              <Link
+                to={bookingLink}
+                state={requestAdminState}
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-2 py-2 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                title="Request admin approval"
+              >
+                <FaBell size={11} />
+                <span className="truncate">Request Admin</span>
               </Link>
             ) : (
               <button
+                type="button"
                 disabled
-                className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-gray-400 bg-gray-100 rounded-lg cursor-not-allowed"
+                className="flex min-w-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-2 py-2 text-[11px] font-semibold text-gray-400"
               >
-                Unavailable
+                <FaCalendarAlt size={11} />
+                <span className="truncate">{getBookButtonLabel(resolvedSlotStatus.type)}</span>
               </button>
             )}
           </div>
@@ -166,7 +198,7 @@ function RoomCard({
             </div>
           </div>
 
-          <StatusBadge canBook={canBook} />
+          <StatusBadge status={resolvedSlotStatus.type} />
         </div>
 
         <p className="text-xs text-slate-500 leading-relaxed mb-3 line-clamp-2">
@@ -198,35 +230,27 @@ function RoomCard({
           )}
         </div>
 
-        <div className="bg-slate-50 border border-slate-100 rounded-lg p-3 mb-3">
+        <div
+          className={`${getAvailabilityPanelClass(
+            resolvedSlotStatus.type
+          )} border rounded-lg p-3 mb-3`}
+        >
           <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-1">
             <FaClock size={11} className="text-blue-500" />
-            <span className="font-semibold">Availability</span>
+            <span className="font-semibold">{resolvedSlotStatus.label}</span>
           </div>
 
-          <p className="text-xs text-slate-600">{nextAvailableSlot}</p>
-
-          <p className="text-[11px] text-slate-400 mt-0.5">
-            Selected: {selectedTimeText}
+          <p className="text-xs font-medium text-slate-700">
+            {selectedTimeText}
           </p>
-        </div>
 
-        <div className="flex items-center gap-1.5 text-xs mb-4">
-          {canBook ? (
-            <>
-              <FaCheckCircle className="text-green-500" size={12} />
-              <span className="text-green-600 font-medium">
-                Available for selected time
-              </span>
-            </>
-          ) : (
-            <>
-              <FaTimesCircle className="text-red-500" size={12} />
-              <span className="text-red-600 font-medium">
-                Not available for selected time
-              </span>
-            </>
-          )}
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {resolvedSlotStatus.helper}
+          </p>
+
+          <p className="text-[11px] text-slate-400 mt-1">
+            Next free: {resolvedSlotStatus.nextAvailableSlot || nextAvailableSlot}
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -241,27 +265,35 @@ function RoomCard({
             className="flex items-center justify-center gap-1.5 text-center bg-slate-100 text-slate-700 text-xs font-semibold py-2 rounded-lg hover:bg-slate-200 transition-colors duration-150"
           >
             <FaEye size={11} />
-             View Schedule
+            View Calendar
           </Link>
 
-          {canBook ? (
+          {canOpenBooking ? (
             <Link
-              to={bookRoomLink}
-              state={{
-                openCalendar: false,
-                resetBookingForm: true,
-              }}
-              className="flex items-center justify-center gap-1.5 text-center bg-blue-600 text-white text-xs font-semibold py-2 rounded-lg hover:bg-blue-700 transition-colors duration-150"
+              to={bookingLink}
+              state={bookingState}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-center text-xs font-semibold text-white transition-colors duration-150 hover:bg-blue-700"
             >
               <FaCalendarAlt size={11} />
-               Book Room
+              Book Room
+            </Link>
+          ) : canRequestAdmin ? (
+            <Link
+              to={bookingLink}
+              state={requestAdminState}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-50 py-2 text-center text-xs font-semibold text-amber-700 transition-colors duration-150 hover:bg-amber-100"
+            >
+              <FaBell size={11} />
+              Request Admin
             </Link>
           ) : (
             <button
+              type="button"
               disabled
-              className="w-full bg-gray-100 text-gray-400 text-xs font-semibold py-2 rounded-lg cursor-not-allowed"
+              className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-gray-100 py-2 text-center text-xs font-semibold text-gray-400"
             >
-              Unavailable
+              <FaCalendarAlt size={11} />
+              {getBookButtonLabel(resolvedSlotStatus.type)}
             </button>
           )}
         </div>
@@ -270,14 +302,79 @@ function RoomCard({
   );
 }
 
-function StatusBadge({ canBook }) {
+function formatTime(timeValue) {
+  if (!timeValue) return "";
+
+  const [hour, minute] = timeValue.split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+
+  return `${String(displayHour).padStart(2, "0")}:${String(minute).padStart(
+    2,
+    "0"
+  )} ${period}`;
+}
+
+function getAvailabilityPanelClass(status) {
+  const statusClasses = {
+    free: "bg-green-50 border-green-100",
+    booked: "bg-red-50 border-red-100",
+    "booked-by-you": "bg-blue-50 border-blue-100",
+    invalid: "bg-amber-50 border-amber-100",
+    unavailable: "bg-slate-50 border-slate-100",
+    "needs-time": "bg-blue-50 border-blue-100",
+  };
+
+  return statusClasses[status] || statusClasses.unavailable;
+}
+
+function getBookButtonLabel(status) {
+  const labels = {
+    booked: "Booked",
+    "booked-by-you": "Booked by you",
+    invalid: "Fix Time",
+    unavailable: "Unavailable",
+    "needs-time": "Pick Time",
+  };
+
+  return labels[status] || "Unavailable";
+}
+
+function StatusBadge({ status }) {
+  const badgeContent = {
+    free: {
+      label: "Available",
+      className: "bg-green-50 text-green-700",
+    },
+    booked: {
+      label: "Booked",
+      className: "bg-red-50 text-red-700",
+    },
+    "booked-by-you": {
+      label: "Booked by you",
+      className: "bg-blue-50 text-blue-700",
+    },
+    invalid: {
+      label: "Check time",
+      className: "bg-amber-50 text-amber-700",
+    },
+    unavailable: {
+      label: "Unavailable",
+      className: "bg-slate-100 text-slate-600",
+    },
+    "needs-time": {
+      label: "Select time",
+      className: "bg-blue-50 text-blue-700",
+    },
+  };
+
+  const selectedBadge = badgeContent[status] || badgeContent.unavailable;
+
   return (
     <span
-      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${
-        canBook ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
-      }`}
+      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${selectedBadge.className}`}
     >
-      {canBook ? "Available" : "Unavailable"}
+      {selectedBadge.label}
     </span>
   );
 }

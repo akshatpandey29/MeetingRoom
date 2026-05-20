@@ -266,9 +266,7 @@ function AdminDashboard() {
               <BookingsSection
                 rooms={rooms}
                 bookings={bookings}
-                users={normalUsers}
                 globalSearch={globalSearch}
-                bookSlot={bookSlot}
                 rescheduleBooking={rescheduleBooking}
                 openModal={openModal}
                 showToast={showToast}
@@ -279,6 +277,7 @@ function AdminDashboard() {
               <RequestsSection
                 rooms={rooms}
                 bookings={bookings}
+                users={normalUsers}
                 adminRequests={adminRequests}
                 globalSearch={globalSearch}
                 bookSlot={bookSlot}
@@ -386,24 +385,14 @@ function convertTo24HourTime(timeValue) {
 function BookingsSection({
   rooms,
   bookings,
-  users,
   globalSearch,
-  bookSlot,
   rescheduleBooking,
   openModal,
   showToast,
 }) {
   const [viewMode, setViewMode] = useState("list");
-
-  const [bookingForm, setBookingForm] = useState({
-    employeeId: "",
-    employeeName: "",
-    employeeEmail: "",
-    roomId: "",
-    date: getTodayDate(),
-    startTime: "",
-    endTime: "",
-  });
+  const [bookingPage, setBookingPage] = useState(1);
+  const bookingsPerPage = 7;
 
   const [bookingSearch, setBookingSearch] = useState("");
   const [dateFilter, setDateFilter] = useState(getTodayDate());
@@ -428,10 +417,6 @@ function BookingsSection({
   const completedBookingsCount = bookings.filter(
     (booking) => booking.date < getTodayDate()
   ).length;
-
-  const activeRooms = rooms.filter(
-    (room) => room.isActive && room.status === "available"
-  );
 
   const filteredBookings = bookings
   .filter((booking) => {
@@ -466,26 +451,319 @@ function BookingsSection({
     return firstDateTime - secondDateTime;
   });
 
-  function handleEmployeeSelect(value) {
-  const selectedUser = users.find((user) => String(user.id) === String(value));
+  const totalBookingPages = Math.max(
+    1,
+    Math.ceil(filteredBookings.length / bookingsPerPage)
+  );
+  const currentBookingPage = Math.min(bookingPage, totalBookingPages);
+  const bookingStartIndex = (currentBookingPage - 1) * bookingsPerPage;
+  const paginatedBookings = filteredBookings.slice(
+    bookingStartIndex,
+    bookingStartIndex + bookingsPerPage
+  );
+  const bookingShowingStart =
+    filteredBookings.length === 0 ? 0 : bookingStartIndex + 1;
+  const bookingShowingEnd = Math.min(
+    bookingStartIndex + bookingsPerPage,
+    filteredBookings.length
+  );
 
-  if (!selectedUser) {
-    setBookingForm((previous) => ({
-      ...previous,
-      employeeId: "",
-      employeeName: "",
-      employeeEmail: "",
-    }));
-    return;
+  function startReschedule(booking) {
+    setEditingBookingId(booking.id);
+    setEditData({
+      newDate: booking.date,
+      newStartTime: booking.startTime || getStartFromSlot(booking.slot),
+      newEndTime: booking.endTime || getEndFromSlot(booking.slot),
+    });
   }
 
-  setBookingForm((previous) => ({
-    ...previous,
-    employeeId: selectedUser.id,
-    employeeName: selectedUser.name,
-    employeeEmail: selectedUser.email,
-  }));
+  async function saveReschedule(booking) {
+    if (!editData.newDate || !editData.newStartTime || !editData.newEndTime) {
+      showToast("error", "Please select date, start time, and end time.");
+      return;
+    }
+
+    if (editData.newDate < getTodayDate()) {
+      showToast("error", "Past date reschedule is not allowed.");
+      return;
+    }
+
+    if (
+      convertTimeToMinutes(editData.newEndTime) <=
+      convertTimeToMinutes(editData.newStartTime)
+    ) {
+      showToast("error", "End time must be after start time.");
+      return;
+    }
+
+    const conflict = hasBookingConflict({
+      bookings,
+      roomId: booking.roomId,
+      date: editData.newDate,
+      startTime: editData.newStartTime,
+      endTime: editData.newEndTime,
+      excludeBookingId: booking.id,
+    });
+
+    if (conflict) {
+      showToast("error", "Another booking already exists for this time.");
+      return;
+    }
+
+    const result = await rescheduleBooking({
+      bookingId: booking.id,
+      newDate: editData.newDate,
+      newStartTime: editData.newStartTime,
+      newEndTime: editData.newEndTime,
+    });
+
+    if (!result.success) {
+      showToast("error", result.message || "Booking could not be rescheduled.");
+      return;
+    }
+
+    showToast("success", "Booking rescheduled successfully.");
+    setEditingBookingId(null);
+  }
+
+  function clearFilters() {
+    setBookingSearch("");
+    setDateFilter("");
+    setRoomFilter("");
+    setStatusFilter("all");
+    setBookingPage(1);
+  }
+
+  return (
+    <>
+      <SectionTitle
+        eyebrow="Bookings"
+        title="Booking Management"
+        description="Manage existing room schedules and booking records."
+      />
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <StatCard
+          title="Total"
+          value={bookings.length}
+          helper="All bookings"
+          icon={<FaCalendarAlt />}
+          tone="blue"
+        />
+
+        <StatCard
+          title="Today"
+          value={todayBookingsCount}
+          helper="Bookings today"
+          icon={<FaClock />}
+          tone="purple"
+        />
+
+        <StatCard
+          title="Upcoming"
+          value={upcomingBookingsCount}
+          helper="Future bookings"
+          icon={<FaCheckCircle />}
+          tone="green"
+        />
+
+        <StatCard
+          title="Completed"
+          value={completedBookingsCount}
+          helper="Past bookings"
+          icon={<FaFileCsv />}
+          tone="slate"
+        />
+      </div>
+
+      <Card>
+        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">All Bookings</h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Showing {bookingShowingStart}-{bookingShowingEnd} of{" "}
+              {filteredBookings.length} filtered bookings.
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              Showing today's bookings. Click Clear to view all.
+            </p>
+          </div>
+
+          <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <Field label="Search">
+            <div className="relative">
+              <FaSearch
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                size={13}
+              />
+
+              <input
+                type="text"
+                value={bookingSearch}
+                onChange={(event) => {
+                  setBookingSearch(event.target.value);
+                  setBookingPage(1);
+                }}
+                placeholder="Search room, user, email..."
+                className="admin-input pl-10"
+              />
+            </div>
+          </Field>
+
+          <DateSelector
+            value={dateFilter}
+            onChange={(value) => {
+              setDateFilter(value);
+              setBookingPage(1);
+            }}
+            label="Date"
+          />
+
+          <Field label="Room">
+            <select
+              value={roomFilter}
+              onChange={(event) => {
+                setRoomFilter(event.target.value);
+                setBookingPage(1);
+              }}
+              className="admin-input"
+            >
+              <option value="">All Rooms</option>
+              {rooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Status">
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value);
+                setBookingPage(1);
+              }}
+              className="admin-input"
+            >
+              <option value="all">All</option>
+              <option value="upcoming">Upcoming</option>
+              <option value="completed">Completed</option>
+            </select>
+          </Field>
+
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 md:w-fit"
+          >
+            <FaFilter size={13} />
+            Clear Filters
+          </button>
+        </div>
+
+        {filteredBookings.length === 0 ? (
+          <EmptyState title="No bookings found" />
+        ) : viewMode === "grid" ? (
+          <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
+            {paginatedBookings.map((booking) => (
+              <BookingCard
+                key={booking.id}
+                booking={booking}
+                editing={editingBookingId === booking.id}
+                editData={editData}
+                setEditData={setEditData}
+                onEdit={() => startReschedule(booking)}
+                onCancelEdit={() => setEditingBookingId(null)}
+                onSave={() => saveReschedule(booking)}
+                onCancelBooking={() =>
+                  openModal({
+                    type: "cancelBooking",
+                    title: "Cancel Booking",
+                    message:
+                      "Are you sure you want to cancel this booking? This action cannot be undone.",
+                    confirmText: "Yes, Cancel",
+                    tone: "red",
+                    payload: booking.id,
+                  })
+                }
+                onDeleteBooking={() =>
+                  openModal({
+                    type: "deleteBookingPermanent",
+                    title: "Delete Booking Record",
+                    message:
+                      "This will permanently delete this booking from the database. This cannot be undone.",
+                    confirmText: "Delete Permanently",
+                    tone: "red",
+                    payload: booking.id,
+                  })
+                }
+              />
+            ))}
+          </div>
+        ) : (
+          <BookingTable
+            bookings={paginatedBookings}
+            editingBookingId={editingBookingId}
+            editData={editData}
+            setEditData={setEditData}
+            startReschedule={startReschedule}
+            saveReschedule={saveReschedule}
+            setEditingBookingId={setEditingBookingId}
+            openModal={openModal}
+          />
+        )}
+
+        {filteredBookings.length > bookingsPerPage && (
+          <PaginationControls
+            currentPage={currentBookingPage}
+            totalPages={totalBookingPages}
+            onPageChange={setBookingPage}
+          />
+        )}
+      </Card>
+    </>
+  );
 }
+
+function AdminUserBookingCard({ rooms, bookings, users, bookSlot, showToast }) {
+  const [bookingForm, setBookingForm] = useState({
+    employeeId: "",
+    employeeName: "",
+    employeeEmail: "",
+    roomId: "",
+    date: getTodayDate(),
+    startTime: "",
+    endTime: "",
+  });
+
+  const activeRooms = rooms.filter(
+    (room) => room.isActive && room.status === "available"
+  );
+
+  function handleEmployeeSelect(value) {
+    const selectedUser = users.find((user) => String(user.id) === String(value));
+
+    if (!selectedUser) {
+      setBookingForm((previous) => ({
+        ...previous,
+        employeeId: "",
+        employeeName: "",
+        employeeEmail: "",
+      }));
+      return;
+    }
+
+    setBookingForm((previous) => ({
+      ...previous,
+      employeeId: selectedUser.id,
+      employeeName: selectedUser.name,
+      employeeEmail: selectedUser.email,
+    }));
+  }
 
   async function handleCreateBooking() {
     if (!bookingForm.employeeName.trim()) {
@@ -583,333 +861,100 @@ function BookingsSection({
     });
   }
 
-  function startReschedule(booking) {
-    setEditingBookingId(booking.id);
-    setEditData({
-      newDate: booking.date,
-      newStartTime: booking.startTime || getStartFromSlot(booking.slot),
-      newEndTime: booking.endTime || getEndFromSlot(booking.slot),
-    });
-  }
-
-  async function saveReschedule(booking) {
-    if (!editData.newDate || !editData.newStartTime || !editData.newEndTime) {
-      showToast("error", "Please select date, start time, and end time.");
-      return;
-    }
-
-    if (editData.newDate < getTodayDate()) {
-      showToast("error", "Past date reschedule is not allowed.");
-      return;
-    }
-
-    if (
-      convertTimeToMinutes(editData.newEndTime) <=
-      convertTimeToMinutes(editData.newStartTime)
-    ) {
-      showToast("error", "End time must be after start time.");
-      return;
-    }
-
-    const conflict = hasBookingConflict({
-      bookings,
-      roomId: booking.roomId,
-      date: editData.newDate,
-      startTime: editData.newStartTime,
-      endTime: editData.newEndTime,
-      excludeBookingId: booking.id,
-    });
-
-    if (conflict) {
-      showToast("error", "Another booking already exists for this time.");
-      return;
-    }
-
-    const result = await rescheduleBooking({
-      bookingId: booking.id,
-      newDate: editData.newDate,
-      newStartTime: editData.newStartTime,
-      newEndTime: editData.newEndTime,
-    });
-
-    if (!result.success) {
-      showToast("error", result.message || "Booking could not be rescheduled.");
-      return;
-    }
-
-    showToast("success", "Booking rescheduled successfully.");
-    setEditingBookingId(null);
-  }
-
-  function clearFilters() {
-    setBookingSearch("");
-    setDateFilter("");
-    setRoomFilter("");
-    setStatusFilter("all");
-  }
-
   return (
-    <>
-      <SectionTitle
-        eyebrow="Bookings"
-        title="Booking Management"
-        description="Create employee bookings and manage existing room schedules."
+    <Card>
+      <CardHeader
+        title="Book Room for User"
+        description="Admin can create a booking directly for an employee."
       />
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <StatCard
-          title="Total"
-          value={bookings.length}
-          helper="All bookings"
-          icon={<FaCalendarAlt />}
-          tone="blue"
-        />
-
-        <StatCard
-          title="Today"
-          value={todayBookingsCount}
-          helper="Bookings today"
-          icon={<FaClock />}
-          tone="purple"
-        />
-
-        <StatCard
-          title="Upcoming"
-          value={upcomingBookingsCount}
-          helper="Future bookings"
-          icon={<FaCheckCircle />}
-          tone="green"
-        />
-
-        <StatCard
-          title="Completed"
-          value={completedBookingsCount}
-          helper="Past bookings"
-          icon={<FaFileCsv />}
-          tone="slate"
-        />
-      </div>
-
-      <Card>
-        <CardHeader
-          title="Book Room for User"
-          description="Admin can create a booking directly for an employee."
-        />
-
-        <div className="p-4">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
-            <Field label="User">
-              <select
-                value={bookingForm.employeeId}
-                onChange={(event) => handleEmployeeSelect(event.target.value)}
-                className="admin-input"
-              >
-                <option value="">Select user</option>
-                {users.map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name} - {user.email}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Room">
-              <select
-                value={bookingForm.roomId}
-                onChange={(event) =>
-                  setBookingForm((previous) => ({
-                    ...previous,
-                    roomId: event.target.value,
-                  }))
-                }
-                className="admin-input"
-              >
-                <option value="">Select room</option>
-                {activeRooms.map((room) => (
-                  <option key={room.id} value={room.id}>
-                    {room.name} - {room.location}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <DateSelector
-              value={bookingForm.date}
-              onChange={(value) =>
-                setBookingForm((previous) => ({
-                  ...previous,
-                  date: value,
-                }))
-              }
-              label="Date"
-            />
-
-            <Field label="Start Time">
-              <TimePickerWheel
-                value={bookingForm.startTime}
-                onChange={(value) =>
-                  setBookingForm((previous) => ({
-                    ...previous,
-                    startTime: value,
-                    endTime: "",
-                  }))
-                }
-                label="Start time"
-              />
-            </Field>
-
-            <Field label="End Time">
-              <TimePickerWheel
-                value={bookingForm.endTime}
-                onChange={(value) =>
-                  setBookingForm((previous) => ({
-                    ...previous,
-                    endTime: value,
-                  }))
-                }
-                disabled={!bookingForm.startTime}
-                label="End time"
-              />
-            </Field>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleCreateBooking}
-            className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
-          >
-            <FaCalendarAlt size={13} />
-            Book Room for User
-          </button>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">All Bookings</h3>
-            <p className="mt-1 text-sm text-slate-500">
-              Showing {filteredBookings.length} of {bookings.length} bookings.
-            </p>
-          </div>
-
-          <ViewToggle viewMode={viewMode} setViewMode={setViewMode} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 border-b border-slate-100 p-4 md:grid-cols-2 xl:grid-cols-4">
-          <Field label="Search">
-            <div className="relative">
-              <FaSearch
-                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-                size={13}
-              />
-
-              <input
-                type="text"
-                value={bookingSearch}
-                onChange={(event) => setBookingSearch(event.target.value)}
-                placeholder="Search room, user, email..."
-                className="admin-input pl-10"
-              />
-            </div>
-          </Field>
-
-          <DateSelector
-            value={dateFilter}
-            onChange={setDateFilter}
-            label="Date"
-          />
-
-          <Field label="Room">
+      <div className="p-4">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <Field label="User">
             <select
-              value={roomFilter}
-              onChange={(event) => setRoomFilter(event.target.value)}
+              value={bookingForm.employeeId}
+              onChange={(event) => handleEmployeeSelect(event.target.value)}
               className="admin-input"
             >
-              <option value="">All Rooms</option>
-              {rooms.map((room) => (
-                <option key={room.id} value={room.id}>
-                  {room.name}
+              <option value="">Select user</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name} - {user.email}
                 </option>
               ))}
             </select>
           </Field>
 
-          <Field label="Status">
+          <Field label="Room">
             <select
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
+              value={bookingForm.roomId}
+              onChange={(event) =>
+                setBookingForm((previous) => ({
+                  ...previous,
+                  roomId: event.target.value,
+                }))
+              }
               className="admin-input"
             >
-              <option value="all">All</option>
-              <option value="upcoming">Upcoming</option>
-              <option value="completed">Completed</option>
+              <option value="">Select room</option>
+              {activeRooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.name} - {room.location}
+                </option>
+              ))}
             </select>
           </Field>
 
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="flex h-10 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-200 md:w-fit"
-          >
-            <FaFilter size={13} />
-            Clear Filters
-          </button>
+          <DateSelector
+            value={bookingForm.date}
+            onChange={(value) =>
+              setBookingForm((previous) => ({
+                ...previous,
+                date: value,
+              }))
+            }
+            label="Date"
+          />
+
+          <Field label="Start Time">
+            <TimePickerWheel
+              value={bookingForm.startTime}
+              onChange={(value) =>
+                setBookingForm((previous) => ({
+                  ...previous,
+                  startTime: value,
+                  endTime: "",
+                }))
+              }
+              label="Start time"
+            />
+          </Field>
+
+          <Field label="End Time">
+            <TimePickerWheel
+              value={bookingForm.endTime}
+              onChange={(value) =>
+                setBookingForm((previous) => ({
+                  ...previous,
+                  endTime: value,
+                }))
+              }
+              disabled={!bookingForm.startTime}
+              label="End time"
+            />
+          </Field>
         </div>
 
-        {filteredBookings.length === 0 ? (
-          <EmptyState title="No bookings found" />
-        ) : viewMode === "grid" ? (
-          <div className="grid grid-cols-1 gap-4 p-4 xl:grid-cols-2">
-            {filteredBookings.map((booking) => (
-              <BookingCard
-                key={booking.id}
-                booking={booking}
-                editing={editingBookingId === booking.id}
-                editData={editData}
-                setEditData={setEditData}
-                onEdit={() => startReschedule(booking)}
-                onCancelEdit={() => setEditingBookingId(null)}
-                onSave={() => saveReschedule(booking)}
-                onCancelBooking={() =>
-                  openModal({
-                    type: "cancelBooking",
-                    title: "Cancel Booking",
-                    message:
-                      "Are you sure you want to cancel this booking? This action cannot be undone.",
-                    confirmText: "Yes, Cancel",
-                    tone: "red",
-                    payload: booking.id,
-                  })
-                }
-                onDeleteBooking={() =>
-                  openModal({
-                    type: "deleteBookingPermanent",
-                    title: "Delete Booking Record",
-                    message:
-                      "This will permanently delete this booking from the database. This cannot be undone.",
-                    confirmText: "Delete Permanently",
-                    tone: "red",
-                    payload: booking.id,
-                  })
-                }
-              />
-            ))}
-          </div>
-        ) : (
-          <BookingTable
-            bookings={filteredBookings}
-            editingBookingId={editingBookingId}
-            editData={editData}
-            setEditData={setEditData}
-            startReschedule={startReschedule}
-            saveReschedule={saveReschedule}
-            setEditingBookingId={setEditingBookingId}
-            openModal={openModal}
-          />
-        )}
-      </Card>
-    </>
+        <button
+          type="button"
+          onClick={handleCreateBooking}
+          className="mt-4 flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+        >
+          <FaCalendarAlt size={13} />
+          Book Room for User
+        </button>
+      </div>
+    </Card>
   );
 }
 
@@ -920,6 +965,7 @@ function BookingsSection({
 function RequestsSection({
   rooms,
   bookings,
+  users,
   adminRequests,
   globalSearch,
   bookSlot,
@@ -1044,7 +1090,7 @@ function RequestsSection({
       <SectionTitle
         eyebrow="Requests"
         title="Booking Requests"
-        description="Review employee requests and approve only valid available slots."
+        description="Review employee requests and create bookings for users when needed."
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -1072,6 +1118,14 @@ function RequestsSection({
           tone="red"
         />
       </div>
+
+      <AdminUserBookingCard
+        rooms={rooms}
+        bookings={bookings}
+        users={users}
+        bookSlot={bookSlot}
+        showToast={showToast}
+      />
 
       <Card>
         <div className="flex flex-col gap-3 border-b border-slate-100 p-4 md:flex-row md:items-center md:justify-between">
@@ -1888,6 +1942,55 @@ function ViewToggle({ viewMode, setViewMode }) {
   );
 }
 
+function PaginationControls({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-slate-500">
+        Page {currentPage} of {totalPages}
+      </p>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+          disabled={currentPage === 1}
+          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+        >
+          Previous
+        </button>
+
+        {pageNumbers.map((pageNumber) => (
+          <button
+            key={pageNumber}
+            type="button"
+            onClick={() => onPageChange(pageNumber)}
+            className={`h-9 min-w-9 rounded-xl px-3 text-sm font-semibold transition ${
+              currentPage === pageNumber
+                ? "bg-blue-600 text-white shadow-sm"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {pageNumber}
+          </button>
+        ))}
+
+        <button
+          type="button"
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+          disabled={currentPage === totalPages}
+          className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function BookingCard({
   booking,
   editing,
@@ -2007,7 +2110,7 @@ function BookingCard({
           <button
             type="button"
             onClick={onDeleteBooking}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.98]"
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl text-red-600 bg-red-200 px-3 text-sm font-semibold  transition hover:bg-red-300 active:scale-[0.98]"
           >
             <FaTrash size={13} />
             Delete Record

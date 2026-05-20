@@ -93,7 +93,6 @@ function ProfilePage() {
           setNameMessage({ text: result?.message || 'Failed to update name.', type: 'error' });
         }
       } else {
-        // localStorage fallback
         setNameMessage({ text: 'Name updated successfully!', type: 'success' });
       }
       setEditingName(false);

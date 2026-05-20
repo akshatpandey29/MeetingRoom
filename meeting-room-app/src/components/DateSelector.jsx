@@ -3,7 +3,15 @@ import DatePicker from "react-datepicker";
 import { FaCalendarAlt, FaChevronDown } from "react-icons/fa";
 import "react-datepicker/dist/react-datepicker.css";
 
-function DateSelector({ value, onChange, label = "Date" }) {
+function DateSelector({
+  value,
+  onChange,
+  label = "Date",
+  helper = "",
+  displayMode = "popover",
+  required = false,
+  size = "default",
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const wrapperRef = useRef(null);
 
@@ -15,6 +23,7 @@ function DateSelector({ value, onChange, label = "Date" }) {
   };
 
   const selectedDate = parseDateString(value);
+  const isLarge = size === "large";
 
   const formatDateForState = (date) => {
     const year = date.getFullYear();
@@ -49,15 +58,26 @@ function DateSelector({ value, onChange, label = "Date" }) {
 
   return (
     <div ref={wrapperRef} className="relative w-full">
-      <label className="flex items-center gap-2 text-sm font-medium text-slate-700 mb-2">
+      <label
+        className={`flex items-center gap-2 font-semibold text-slate-700 mb-2 ${
+          isLarge ? "text-base" : "text-sm"
+        }`}
+      >
         <FaCalendarAlt className="text-blue-500" size={13} />
         {label}
+        {required && <span className="text-red-500">•</span>}
       </label>
+
+      {helper && (
+        <p className="mb-3 text-xs text-slate-500">{helper}</p>
+      )}
 
       <button
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
-        className={`w-full flex items-center justify-between px-4 py-2.5 border rounded-xl text-sm bg-white text-slate-800 outline-none transition-all ${
+        className={`w-full flex items-center justify-between px-4 border rounded-xl bg-white text-slate-800 outline-none transition-all ${
+          isLarge ? "py-3.5 text-base" : "py-2.5 text-sm"
+        } ${
           isOpen
             ? "border-blue-500 ring-2 ring-blue-100"
             : "border-gray-300 hover:border-blue-400"
@@ -74,7 +94,13 @@ function DateSelector({ value, onChange, label = "Date" }) {
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-[78px] z-50 bg-white border border-gray-200 rounded-2xl shadow-xl p-3">
+        <div
+          className={`z-50 mt-2 bg-white border border-gray-200 rounded-2xl shadow-xl p-3 ${
+            displayMode === "inline"
+              ? "relative w-fit max-w-full"
+              : "absolute left-0 top-full"
+          }`}
+        >
           <DatePicker
             selected={selectedDate}
             onChange={(date) => {

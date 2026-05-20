@@ -14,6 +14,11 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
       icon: <FaCalendarCheck size={13} />,
     },
     {
+      id: "rooms",
+      label: "Rooms",
+      icon: <FaDoorOpen size={13} />,
+    },
+    {
       id: "requests",
       label: "Requests",
       icon: <FaBell size={13} />,
@@ -23,11 +28,6 @@ function AdminSidebar({ activeSection, setActiveSection, pendingCount }) {
       id: "users",
       label: "Users",
       icon: <FaUsers size={13} />,
-    },
-    {
-      id: "rooms",
-      label: "Rooms",
-      icon: <FaDoorOpen size={13} />,
     },
     {
       id: "reports",

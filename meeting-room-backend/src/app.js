@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const cookieParser = require('cookie-parser');
 const env = require('./config/env');
 const { globalLimiter } = require('./middleware/rateLimiter');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
@@ -13,11 +14,16 @@ const bookingRoutes = require('./routes/bookingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
+const allowedOrigins = Array.from(new Set([
+  env.clientUrl,
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+]));
 
 // Security
 app.use(helmet());
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -32,12 +38,13 @@ app.use(morgan('dev'));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Health check
 app.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Backend is running!',
+    message: 'Backend is running.',
     data: {
       service: 'meeting-room-scheduler-api',
       environment: env.nodeEnv,
