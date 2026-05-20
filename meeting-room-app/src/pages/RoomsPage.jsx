@@ -3,8 +3,6 @@ import {
   FaBuilding,
   FaCalendarAlt,
   FaClock,
-  FaDoorOpen,
-  FaHourglassHalf,
   FaList,
   FaSearch,
   FaThLarge,
@@ -39,7 +37,6 @@ function RoomsPage() {
   const {
     rooms,
     bookings,
-    adminRequests,
     fetchBookingsByRoomAndDate,
   } = useRooms();
   const { user } = useAuth();
@@ -52,7 +49,8 @@ function RoomsPage() {
   const [capacityKey, setCapacityKey] = useState("");
   const [floorFilter, setFloorFilter] = useState("");
   const [viewMode, setViewMode] = useState("grid");
-  const [showFormError, setShowFormError] = useState(false);
+  const [formErrorMessage, setFormErrorMessage] = useState("");
+  const [hasSubmittedAvailability, setHasSubmittedAvailability] = useState(false);
 
   function getTodayDate() {
     const currentDate = new Date();
@@ -61,6 +59,32 @@ function RoomsPage() {
     const day = String(currentDate.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
+  }
+
+  function minutesToTimeValue(totalMinutes) {
+    const cappedMinutes = Math.min(totalMinutes, 24 * 60);
+    const hour = Math.floor(cappedMinutes / 60);
+    const minute = cappedMinutes % 60;
+
+    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(
+      2,
+      "0"
+    )}`;
+  }
+
+  function getCurrentRoundedTime() {
+    const now = new Date();
+    const currentMinutes =
+      now.getHours() * 60 +
+      now.getMinutes() +
+      (now.getSeconds() > 0 || now.getMilliseconds() > 0 ? 1 : 0);
+    const roundedMinutes = Math.ceil(currentMinutes / 5) * 5;
+
+    return minutesToTimeValue(roundedMinutes);
+  }
+
+  function getMinimumStartTimeForDate(dateValue) {
+    return dateValue === getTodayDate() ? getCurrentRoundedTime() : "";
   }
 
   function convertTimeToMinutes(timeValue) {
@@ -96,6 +120,10 @@ function RoomsPage() {
     )} ${period}`;
   }
 
+  function addMinutesToTime(timeValue, minutesToAdd) {
+    return minutesToTimeValue(convertTimeToMinutes(timeValue) + minutesToAdd);
+  }
+
   function getBookingStartTime(booking) {
     return booking.startTime || booking.slot?.split("-")[0]?.trim() || "";
   }
@@ -106,6 +134,22 @@ function RoomsPage() {
 
   function isActiveBooking(booking) {
     return booking.status !== "cancelled";
+  }
+
+  function isCurrentUserBooking(booking) {
+    const currentUserId = String(user?.id || user?._id || "");
+    const bookingUserId = String(
+      booking?.userId?._id || booking?.userId?.id || booking?.userId || ""
+    );
+    const currentUserEmail = String(user?.email || "").toLowerCase();
+    const bookingUserEmail = String(
+      booking?.userEmail || booking?.userId?.email || ""
+    ).toLowerCase();
+
+    return (
+      (currentUserId && bookingUserId === currentUserId) ||
+      (currentUserEmail && bookingUserEmail === currentUserEmail)
+    );
   }
 
   function getRoomBookingsForDate(roomId) {
@@ -201,6 +245,17 @@ function RoomsPage() {
       };
     }
 
+    if (isPastStartTime) {
+      return {
+        type: "invalid",
+        label: "Past time selected",
+        helper: "Start time must be current or future.",
+        selectedSlotText,
+        nextAvailableSlot,
+        canBook: false,
+      };
+    }
+
     if (isInvalidTimeRange) {
       return {
         type: "invalid",
@@ -217,14 +272,17 @@ function RoomsPage() {
     if (conflictingBooking) {
       const conflictStart = getBookingStartTime(conflictingBooking);
       const conflictEnd = getBookingEndTime(conflictingBooking);
+      const bookedByCurrentUser = isCurrentUserBooking(conflictingBooking);
       const conflictSlot =
         conflictingBooking.slot ||
         `${formatTime(conflictStart)} - ${formatTime(conflictEnd)}`;
 
       return {
-        type: "booked",
-        label: "Booked for selected time",
-        helper: `Booked: ${conflictSlot}.`,
+        type: bookedByCurrentUser ? "booked-by-you" : "booked",
+        label: bookedByCurrentUser ? "Booked by you" : "Booked",
+        helper: bookedByCurrentUser
+          ? `You already booked this slot: ${conflictSlot}.`
+          : `Booked: ${conflictSlot}. Send an admin request if this time is important.`,
         selectedSlotText,
         nextAvailableSlot,
         canBook: false,
@@ -233,7 +291,7 @@ function RoomsPage() {
 
     return {
       type: "free",
-      label: "Free for selected time",
+      label: "Available",
       helper: "This room is available for your selected slot.",
       selectedSlotText,
       nextAvailableSlot,
@@ -244,12 +302,31 @@ function RoomsPage() {
   function handleStartTimeChange(time) {
     setStartTime(time);
     setEndTime("");
-    setShowFormError(false);
+    setFormErrorMessage("");
+    setHasSubmittedAvailability(false);
   }
 
   function handleEndTimeChange(time) {
     setEndTime(time);
-    setShowFormError(false);
+    setFormErrorMessage("");
+    setHasSubmittedAvailability(false);
+  }
+
+  function handleDateChange(date) {
+    const minimumTime = getMinimumStartTimeForDate(date);
+    const shouldClearTimes =
+      minimumTime &&
+      startTime &&
+      convertTimeToMinutes(startTime) < convertTimeToMinutes(minimumTime);
+
+    setSelectedDate(date);
+    setFormErrorMessage("");
+    setHasSubmittedAvailability(false);
+
+    if (shouldClearTimes) {
+      setStartTime("");
+      setEndTime("");
+    }
   }
 
   function clearFilters() {
@@ -260,17 +337,39 @@ function RoomsPage() {
     setCapacityKey("");
     setFloorFilter("");
     setViewMode("grid");
-    setShowFormError(false);
+    setFormErrorMessage("");
+    setHasSubmittedAvailability(false);
   }
 
   function handleShowRooms() {
-    if (isInvalidTimeRange) {
-      setShowFormError(true);
+    if (!selectedDate || !startTime || !endTime) {
+      setFormErrorMessage("Date, start time, and end time are required.");
       return;
     }
 
-    setShowFormError(false);
-    resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const currentMinimumStartTime = getMinimumStartTimeForDate(selectedDate);
+    const selectedStartIsPast = Boolean(
+      currentMinimumStartTime &&
+        startTime &&
+        convertTimeToMinutes(startTime) <
+          convertTimeToMinutes(currentMinimumStartTime)
+    );
+
+    if (selectedStartIsPast) {
+      setFormErrorMessage("Start time must be current or future.");
+      return;
+    }
+
+    if (isInvalidTimeRange) {
+      setFormErrorMessage("End time must be after start time.");
+      return;
+    }
+
+    setFormErrorMessage("");
+    setHasSubmittedAvailability(true);
+    window.setTimeout(() => {
+      resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   }
 
   const activeRooms = useMemo(
@@ -302,12 +401,35 @@ function RoomsPage() {
     (option) => option.key === capacityKey
   );
 
+  const minimumStartTime = getMinimumStartTimeForDate(selectedDate);
+  const minimumEndTime = (() => {
+    const minimumAfterStart = startTime ? addMinutesToTime(startTime, 5) : "";
+
+    if (minimumStartTime && minimumAfterStart) {
+      return convertTimeToMinutes(minimumAfterStart) >
+        convertTimeToMinutes(minimumStartTime)
+        ? minimumAfterStart
+        : minimumStartTime;
+    }
+
+    return minimumAfterStart || minimumStartTime;
+  })();
+
+  const isPastStartTime = Boolean(
+    minimumStartTime &&
+      startTime &&
+      convertTimeToMinutes(startTime) < convertTimeToMinutes(minimumStartTime)
+  );
+
   const isInvalidTimeRange =
     startTime &&
     endTime &&
     convertTimeToMinutes(endTime) <= convertTimeToMinutes(startTime);
 
-  const hasCompleteValidSlot = Boolean(startTime && endTime && !isInvalidTimeRange);
+  const hasCompleteValidSlot = Boolean(
+    startTime && endTime && !isInvalidTimeRange && !isPastStartTime
+  );
+  const canShowAvailableRooms = Boolean(selectedDate && hasCompleteValidSlot);
 
   const selectedSlotText =
     startTime && endTime
@@ -344,359 +466,309 @@ function RoomsPage() {
     const matchesCapacity =
       !selectedCapacity || room.capacity >= selectedCapacity.minCapacity;
 
-    const matchesAvailability =
-      !hasCompleteValidSlot || room.isAvailableForSelectedTime;
-
-    return matchesSearch && matchesFloor && matchesCapacity && matchesAvailability;
+    return matchesSearch && matchesFloor && matchesCapacity;
   });
 
-  const bookedTodayCount = bookings.filter(
-    (booking) => booking.date === selectedDate && isActiveBooking(booking)
-  ).length;
-
-  const myUpcomingBookingsCount = bookings.filter((booking) => {
-    const isMyBooking = booking.userEmail === user?.email;
-    const isUpcoming = booking.date >= getTodayDate();
-
-    return isMyBooking && isUpcoming && isActiveBooking(booking);
-  }).length;
-
-  const myPendingRequestsCount = adminRequests.filter((request) => {
-    const isMyRequest = request.userEmail === user?.email;
-    const isPending = request.status === "pending";
-
-    return isMyRequest && isPending;
-  }).length;
-
-  const summaryCards = useMemo(
-    () => [
-      {
-        title: "Available Rooms",
-        value: filteredRooms.length,
-        icon: <FaDoorOpen />,
-        helper: hasCompleteValidSlot ? "For selected time" : "Active now",
-        color: "text-green-600",
-        bg: "bg-green-50",
-      },
-      {
-        title: "Booked Today",
-        value: bookedTodayCount,
-        icon: <FaCalendarAlt />,
-        helper: selectedDate,
-        color: "text-blue-600",
-        bg: "bg-blue-50",
-      },
-      {
-        title: "My Upcoming Bookings",
-        value: myUpcomingBookingsCount,
-        icon: <FaClock />,
-        helper: user?.name || "Logged-in user",
-        color: "text-purple-600",
-        bg: "bg-purple-50",
-      },
-      {
-        title: "Pending Requests",
-        value: myPendingRequestsCount,
-        icon: <FaHourglassHalf />,
-        helper: "Waiting for admin",
-        color: "text-amber-600",
-        bg: "bg-amber-50",
-      },
-    ],
-    [
-      bookedTodayCount,
-      filteredRooms.length,
-      hasCompleteValidSlot,
-      myPendingRequestsCount,
-      myUpcomingBookingsCount,
-      selectedDate,
-      user,
-    ]
-  );
-
   return (
-    <section className="min-h-screen px-4 md:px-6 py-5 bg-slate-50">
+    <section className="min-h-screen px-4 py-6 md:px-6 md:py-8 bg-slate-50">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-5">
-          <p className="text-xs font-semibold text-blue-600 mb-1.5">
-            Meeting Rooms
-          </p>
+        <div className="mb-7 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.55fr]">
+            <aside className="bg-slate-950 px-6 py-7 text-white md:px-8 lg:min-h-[520px]">
+              <p className="text-xs font-bold uppercase text-blue-300">
+                Meeting Rooms
+              </p>
 
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">
-            Find a Room
-          </h1>
+              <h1 className="mt-4 max-w-sm text-3xl font-bold md:text-4xl">
+                Find a Room
+              </h1>
 
-          <p className="text-slate-500 mt-1.5 max-w-2xl text-sm">
-            Fill the form, check availability, then book the room that fits.
-          </p>
-        </div>
+              <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
+                Select a future slot first. RoomBook will show matching rooms with
+                clear availability before you move to the booking page.
+              </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
-          {summaryCards.map((card) => (
-            <div
-              key={card.title}
-              className="bg-white border border-gray-200 rounded-xl shadow-sm p-3.5 flex items-center gap-3"
-            >
-              <div
-                className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm ${card.bg} ${card.color}`}
-              >
-                {card.icon}
+              <div className="mt-8 space-y-5">
+                <GuideStep
+                  number="1"
+                  title="Choose the meeting time"
+                  description="Date, start time, and end time are required to check availability."
+                />
+                <GuideStep
+                  number="2"
+                  title="Refine the room match"
+                  description="Use capacity, floor, or amenities when you need a specific setup."
+                />
+                <GuideStep
+                  number="3"
+                  title="Continue with the right action"
+                  description="Available rooms can be booked. Booked slots can be sent for admin approval."
+                />
               </div>
 
-              <div>
-                <p className="text-xs text-slate-500">{card.title}</p>
-
-                <h3 className="text-xl font-bold text-slate-900 leading-tight">
-                  {card.value}
-                </h3>
-
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {card.helper}
+              <div className="mt-8 border-t border-white/10 pt-6">
+                <p className="text-xs font-semibold uppercase text-slate-400">
+                  Selected slot
+                </p>
+                <p className="mt-2 text-lg font-bold text-white">
+                  {selectedSlotText || "No time selected yet"}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-slate-400">
+                  Fields marked with a red dot are required before rooms can be shown.
                 </p>
               </div>
-            </div>
-          ))}
-        </div>
+            </aside>
 
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="rounded-t-xl bg-blue-700 px-5 py-4 text-white sm:px-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 text-blue-50">
-                  <FaCalendarAlt size={15} />
+            <div className="px-5 py-6 sm:px-7 sm:py-7 xl:px-9 xl:py-8">
+              <div className="mb-7 flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <FaCalendarAlt size={18} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-xl font-bold leading-tight text-slate-900">
+                      Room Availability
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Complete the required fields, then show matching rooms.
+                    </p>
+                  </div>
                 </div>
 
-                <div>
-                  <h2 className="text-base font-bold leading-tight">
-                    Room Availability
-                  </h2>
-                  <p className="mt-1 text-xs font-medium text-blue-100">
-                    Pick a meeting slot, match capacity, then continue with the room that fits.
-                  </p>
+                <div className="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600">
+                  Required fields have a red dot
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-blue-50">
-                <span className="rounded-full bg-white/15 px-3 py-1">
-                  1. Date & time
-                </span>
-                <span className="rounded-full bg-white/15 px-3 py-1">
-                  2. Capacity
-                </span>
-                <span className="rounded-full bg-white/15 px-3 py-1">
-                  3. Available rooms
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-5 py-5 sm:px-6">
-            <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <DateSelector
-                value={selectedDate}
-                onChange={(date) => {
-                  setSelectedDate(date);
-                  setShowFormError(false);
-                }}
-                label="Date"
-              />
-
-              <CompactField
-                icon={<FaClock className="text-blue-500" size={13} />}
-                label="Start Time"
-              >
-                <TimePickerWheel
-                  value={startTime}
-                  onChange={handleStartTimeChange}
-                  disabled={false}
-                  label="Select start time"
+              <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+                <DateSelector
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  label="Date"
+                  required
+                  size="large"
                 />
-              </CompactField>
 
-              <CompactField
-                icon={<FaClock className="text-blue-500" size={13} />}
-                label="End Time"
-              >
-                <TimePickerWheel
-                  value={endTime}
-                  onChange={handleEndTimeChange}
-                  disabled={!startTime}
-                  label="Select end time"
-                />
-              </CompactField>
-
-              <CompactField
-                icon={<FaBuilding className="text-blue-500" size={13} />}
-                label="Floor"
-              >
-                <select
-                  value={floorFilter}
-                  onChange={(event) => setFloorFilter(event.target.value)}
-                  className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                <CompactField
+                  icon={<FaClock className="text-blue-500" size={14} />}
+                  label="Start Time"
+                  required
                 >
-                  <option value="">Any floor</option>
-                  {floorOptions.map((floor) => (
-                    <option key={floor} value={floor}>
-                      {floor}
-                    </option>
-                  ))}
-                </select>
-              </CompactField>
+                  <TimePickerWheel
+                    value={startTime}
+                    onChange={handleStartTimeChange}
+                    disabled={false}
+                    label="Select start time"
+                    minTime={minimumStartTime}
+                    minTimeMessage={
+                      minimumStartTime ? "Past times are disabled for today." : ""
+                    }
+                    size="large"
+                  />
+                </CompactField>
 
-              <div className="xl:col-span-2">
-                <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                  <FaUsers className="text-blue-500" size={13} />
-                  Capacity
-                </label>
+                <CompactField
+                  icon={<FaClock className="text-blue-500" size={14} />}
+                  label="End Time"
+                  required
+                >
+                  <TimePickerWheel
+                    value={endTime}
+                    onChange={handleEndTimeChange}
+                    disabled={!startTime}
+                    label="Select end time"
+                    minTime={minimumEndTime}
+                    minTimeMessage={
+                      minimumEndTime ? "Choose a valid future end time." : ""
+                    }
+                    size="large"
+                  />
+                </CompactField>
 
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {CAPACITY_OPTIONS.map((option) => (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() =>
-                        setCapacityKey((currentKey) =>
-                          currentKey === option.key ? "" : option.key
-                        )
-                      }
-                      className={`min-h-11 rounded-lg border px-3 py-2 text-xs font-bold transition-all ${
-                        capacityKey === option.key
-                          ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"
-                      }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+                <CompactField
+                  icon={<FaBuilding className="text-blue-500" size={14} />}
+                  label="Floor"
+                >
+                  <select
+                    value={floorFilter}
+                    onChange={(event) => setFloorFilter(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-base text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">Any floor</option>
+                    {floorOptions.map((floor) => (
+                      <option key={floor} value={floor}>
+                        {floor}
+                      </option>
+                    ))}
+                  </select>
+                </CompactField>
+
+                <div className="xl:col-span-2">
+                  <label className="mb-2 flex items-center gap-2 text-base font-semibold text-slate-700">
+                    <FaUsers className="text-blue-500" size={14} />
+                    Capacity
+                  </label>
+
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {CAPACITY_OPTIONS.map((option) => (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() =>
+                          setCapacityKey((currentKey) =>
+                            currentKey === option.key ? "" : option.key
+                          )
+                        }
+                        className={`min-h-14 rounded-xl border px-4 py-3 text-sm font-bold transition-all ${
+                          capacityKey === option.key
+                            ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+
+                <CompactField
+                  icon={<FaSearch className="text-blue-500" size={14} />}
+                  label="Room or Amenity"
+                  className="xl:col-span-3"
+                >
+                  <input
+                    type="text"
+                    placeholder="Projector, whiteboard, room name..."
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    className="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </CompactField>
               </div>
 
-              <CompactField
-                icon={<FaSearch className="text-blue-500" size={13} />}
-                label="Room or Amenity"
-                className="xl:col-span-2"
-              >
-                <input
-                  type="text"
-                  placeholder="Projector, whiteboard, room name..."
-                  value={searchText}
-                  onChange={(event) => setSearchText(event.target.value)}
-                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-              </CompactField>
-            </div>
+              {(isInvalidTimeRange || isPastStartTime || formErrorMessage) && (
+                <p className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                  {formErrorMessage ||
+                    (isPastStartTime
+                      ? "Start time must be current or future."
+                      : "End time must be after start time.")}
+                </p>
+              )}
 
-            {(isInvalidTimeRange || showFormError) && (
-              <p className="mt-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-medium text-red-600">
-                End time must be after start time.
-              </p>
-            )}
-
-            <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
-              <button
-                type="button"
-                onClick={handleShowRooms}
-                className="min-h-11 flex-1 rounded-lg bg-blue-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-100"
-              >
-                Show Available Rooms
-              </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="min-h-11 rounded-lg px-5 py-2.5 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-200"
-              >
-                Clear
-              </button>
-
+              <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  onClick={handleShowRooms}
+                  disabled={!canShowAvailableRooms}
+                  className={`min-h-14 flex-1 rounded-xl px-6 py-3 text-base font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                    canShowAvailableRooms
+                      ? "bg-blue-700 text-white hover:bg-blue-800"
+                      : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+                  }`}
+                >
+                  Show Available Rooms
+                </button>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="min-h-14 rounded-xl px-6 py-3 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-100"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
-        <div
-          ref={resultsRef}
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 scroll-mt-24"
-        >
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
-              {hasCompleteValidSlot ? "Available Rooms" : "Matching Rooms"}
-            </h2>
-
-            <p className="text-xs text-slate-500 mt-0.5">
-              Showing {filteredRooms.length} room
-              {filteredRooms.length !== 1 ? "s" : ""}
-              {selectedSlotText ? ` for ${selectedSlotText}` : ""}
-            </p>
-          </div>
-
-          <div className="relative inline-flex w-fit items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                viewMode === "grid"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
+        {hasSubmittedAvailability && (
+          <>
+            <div
+              ref={resultsRef}
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 scroll-mt-24"
             >
-              <FaThLarge size={11} />
-              Grid
-            </button>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Rooms for Selected Slot
+                </h2>
 
-            <button
-              type="button"
-              onClick={() => setViewMode("list")}
-              className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
-                viewMode === "list"
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <FaList size={11} />
-              List
-            </button>
-          </div>
-        </div>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Showing {filteredRooms.length} room
+                  {filteredRooms.length !== 1 ? "s" : ""} for {selectedSlotText}
+                </p>
+              </div>
 
-        {filteredRooms.length > 0 ? (
-          <div
-            key={viewMode}
-            className={`transition-all duration-300 ease-out animate-[fadeSlide_0.28s_ease-out] ${
-              viewMode === "grid"
-                ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
-                : "space-y-3"
-            }`}
-          >
-            {filteredRooms.map((room, index) => (
+              <div className="relative inline-flex w-fit items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setViewMode("grid")}
+                  className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                    viewMode === "grid"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <FaThLarge size={11} />
+                  Grid
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewMode("list")}
+                  className={`relative z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-300 ${
+                    viewMode === "list"
+                      ? "bg-slate-900 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <FaList size={11} />
+                  List
+                </button>
+              </div>
+            </div>
+
+            {filteredRooms.length > 0 ? (
               <div
-                key={room.id}
-                className="transition-all duration-300 ease-out"
-                style={{
-                  animation: `fadeSlide 0.28s ease-out ${index * 35}ms both`,
-                }}
+                key={viewMode}
+                className={`transition-all duration-300 ease-out animate-[fadeSlide_0.28s_ease-out] ${
+                  viewMode === "grid"
+                    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+                    : "space-y-3"
+                }`}
               >
-                <RoomCard
-                  room={room}
-                  viewMode={viewMode}
-                  selectedDate={selectedDate}
-                  startTime={startTime}
-                  endTime={endTime}
-                  nextAvailableSlot={room.nextAvailableSlot}
-                  isAvailableForSelectedTime={room.isAvailableForSelectedTime}
-                  slotStatus={room.slotStatus}
-                />
+                {filteredRooms.map((room, index) => (
+                  <div
+                    key={room.id}
+                    className="transition-all duration-300 ease-out"
+                    style={{
+                      animation: `fadeSlide 0.28s ease-out ${index * 35}ms both`,
+                    }}
+                  >
+                    <RoomCard
+                      room={room}
+                      viewMode={viewMode}
+                      selectedDate={selectedDate}
+                      startTime={startTime}
+                      endTime={endTime}
+                      nextAvailableSlot={room.nextAvailableSlot}
+                      isAvailableForSelectedTime={room.isAvailableForSelectedTime}
+                      slotStatus={room.slotStatus}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
-            <h3 className="text-base font-semibold text-slate-800 mb-1">
-              No rooms found
-            </h3>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+                <h3 className="text-base font-semibold text-slate-800 mb-1">
+                  No rooms found
+                </h3>
 
-            <p className="text-slate-500 text-sm">
-              Try changing the date, time, team size, floor, or room preference.
-            </p>
-          </div>
+                <p className="text-slate-500 text-sm">
+                  Try changing the date, time, team size, floor, or room preference.
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -718,14 +790,29 @@ function RoomsPage() {
   );
 }
 
-function CompactField({ icon, label, className = "", children }) {
+function CompactField({ icon, label, required = false, className = "", children }) {
   return (
     <div className={className}>
-      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+      <label className="mb-2 flex items-center gap-2 text-base font-semibold text-slate-700">
         {icon}
         {label}
+        {required && <span className="text-red-500">•</span>}
       </label>
       {children}
+    </div>
+  );
+}
+
+function GuideStep({ number, title, description }) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+        {number}
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
+      </div>
     </div>
   );
 }

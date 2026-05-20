@@ -1,12 +1,10 @@
 import { Link } from "react-router-dom";
 import {
+  FaBell,
   FaCalendarAlt,
-  FaCheckCircle,
   FaClock,
   FaEye,
-  FaInfoCircle,
   FaMapMarkerAlt,
-  FaTimesCircle,
   FaUsers,
 } from "react-icons/fa";
 
@@ -28,7 +26,7 @@ function RoomCard({
     slotStatus ||
     {
       type: fallbackCanBook ? "free" : "needs-time",
-      label: fallbackCanBook ? "Free for selected time" : "Select a time",
+      label: fallbackCanBook ? "Available" : "Select a time",
       helper: fallbackCanBook
         ? "This room is available for your selected slot."
         : "Select start and end time to check this room.",
@@ -41,8 +39,8 @@ function RoomCard({
     };
 
   const canOpenBooking =
-    isRoomActiveAndAvailable &&
-    !["booked", "invalid", "unavailable"].includes(resolvedSlotStatus.type);
+    isRoomActiveAndAvailable && Boolean(resolvedSlotStatus.canBook);
+  const canRequestAdmin = resolvedSlotStatus.type === "booked";
   const selectedTimeText =
     resolvedSlotStatus.selectedSlotText ||
     (startTime && endTime
@@ -60,6 +58,10 @@ function RoomCard({
     startTime,
     endTime,
     openBookingForm: true,
+  };
+  const requestAdminState = {
+    ...bookingState,
+    requestAdmin: true,
   };
 
   if (viewMode === "list") {
@@ -155,6 +157,16 @@ function RoomCard({
                 <FaCalendarAlt size={11} />
                 <span className="truncate">Book Room</span>
               </Link>
+            ) : canRequestAdmin ? (
+              <Link
+                to={bookingLink}
+                state={requestAdminState}
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-2 py-2 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                title="Request admin approval"
+              >
+                <FaBell size={11} />
+                <span className="truncate">Request Admin</span>
+              </Link>
             ) : (
               <button
                 type="button"
@@ -241,8 +253,6 @@ function RoomCard({
           </p>
         </div>
 
-        <AvailabilityLine status={resolvedSlotStatus.type} />
-
         <div className="grid grid-cols-2 gap-2">
           <Link
             to={scheduleLink}
@@ -266,6 +276,15 @@ function RoomCard({
             >
               <FaCalendarAlt size={11} />
               Book Room
+            </Link>
+          ) : canRequestAdmin ? (
+            <Link
+              to={bookingLink}
+              state={requestAdminState}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-50 py-2 text-center text-xs font-semibold text-amber-700 transition-colors duration-150 hover:bg-amber-100"
+            >
+              <FaBell size={11} />
+              Request Admin
             </Link>
           ) : (
             <button
@@ -300,6 +319,7 @@ function getAvailabilityPanelClass(status) {
   const statusClasses = {
     free: "bg-green-50 border-green-100",
     booked: "bg-red-50 border-red-100",
+    "booked-by-you": "bg-blue-50 border-blue-100",
     invalid: "bg-amber-50 border-amber-100",
     unavailable: "bg-slate-50 border-slate-100",
     "needs-time": "bg-blue-50 border-blue-100",
@@ -311,6 +331,7 @@ function getAvailabilityPanelClass(status) {
 function getBookButtonLabel(status) {
   const labels = {
     booked: "Booked",
+    "booked-by-you": "Booked by you",
     invalid: "Fix Time",
     unavailable: "Unavailable",
     "needs-time": "Pick Time",
@@ -319,56 +340,19 @@ function getBookButtonLabel(status) {
   return labels[status] || "Unavailable";
 }
 
-function AvailabilityLine({ status }) {
-  const lineContent = {
-    free: {
-      icon: <FaCheckCircle className="text-green-500" size={12} />,
-      text: "Slot is free. You can book it now.",
-      className: "text-green-600",
-    },
-    booked: {
-      icon: <FaTimesCircle className="text-red-500" size={12} />,
-      text: "Slot is already booked.",
-      className: "text-red-600",
-    },
-    invalid: {
-      icon: <FaInfoCircle className="text-amber-500" size={12} />,
-      text: "Choose an end time after the start time.",
-      className: "text-amber-600",
-    },
-    unavailable: {
-      icon: <FaTimesCircle className="text-slate-400" size={12} />,
-      text: "Room is not open for booking right now.",
-      className: "text-slate-500",
-    },
-    "needs-time": {
-      icon: <FaInfoCircle className="text-blue-500" size={12} />,
-      text: "Pick start and end time to check availability.",
-      className: "text-blue-600",
-    },
-  };
-
-  const selectedLine = lineContent[status] || lineContent.unavailable;
-
-  return (
-    <div className="flex items-center gap-1.5 text-xs mb-4">
-      {selectedLine.icon}
-      <span className={`${selectedLine.className} font-medium`}>
-        {selectedLine.text}
-      </span>
-    </div>
-  );
-}
-
 function StatusBadge({ status }) {
   const badgeContent = {
     free: {
-      label: "Free",
+      label: "Available",
       className: "bg-green-50 text-green-700",
     },
     booked: {
       label: "Booked",
       className: "bg-red-50 text-red-700",
+    },
+    "booked-by-you": {
+      label: "Booked by you",
+      className: "bg-blue-50 text-blue-700",
     },
     invalid: {
       label: "Check time",
