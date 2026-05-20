@@ -11,6 +11,7 @@ import {
 
 import RoomCard from "../components/RoomCard";
 import DateSelector from "../components/DateSelector";
+import RoomScheduleBoard from "../components/RoomScheduleBoard";
 import TimePickerWheel from "../components/TimePickerWheel";
 import { useRooms } from "../context/RoomContext";
 import { useAuth } from "../context/AuthContext";
@@ -43,6 +44,7 @@ function RoomsPage() {
   const resultsRef = useRef(null);
 
   const [searchText, setSearchText] = useState("");
+  const [scheduleDate, setScheduleDate] = useState(getTodayDate());
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -472,6 +474,15 @@ function RoomsPage() {
   return (
     <section className="min-h-screen px-4 py-6 md:px-6 md:py-8 bg-slate-50">
       <div className="max-w-7xl mx-auto">
+        <RoomScheduleBoard
+          rooms={activeRooms}
+          bookings={bookings}
+          currentUser={user}
+          selectedDate={scheduleDate}
+          onDateChange={setScheduleDate}
+          fetchBookingsByRoomAndDate={fetchBookingsByRoomAndDate}
+        />
+
         <div className="mb-7 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.55fr]">
             <aside className="bg-slate-950 px-6 py-7 text-white md:px-8 lg:min-h-[520px]">

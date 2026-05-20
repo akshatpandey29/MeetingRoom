@@ -3,15 +3,15 @@ const nodemailer = require('nodemailer');
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'plaxonic65@gmail.com',
-    pass: 'hhdiuzxudwrgpyqt'
+    user: 'akshat4ever1@gmail.com',
+    pass: 'cupsxmzguvleolgf'
   }
 });
 
 transporter.sendMail({
-  from: 'plaxonic65@gmail.com',
-  to: 'plaxonic65@gmail.com',
-  subject: 'Test Email',
+  from: 'akshat4ever1@gmail.com',
+  to: 'aksha4ever1@gmail.com',
+  subject: 'RoomBook Test Email',
   text: 'Email is working!'
 }, (err, info) => {
   if(err) console.log('ERROR:', err.message);

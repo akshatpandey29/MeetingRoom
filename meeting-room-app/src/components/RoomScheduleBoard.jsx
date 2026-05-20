@@ -1,0 +1,887 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import DatePicker from "react-datepicker";
+import { useNavigate } from "react-router-dom";
+import {
+  FaCalendarAlt,
+  FaChevronDown,
+  FaChevronLeft,
+  FaChevronRight,
+  FaClock,
+} from "react-icons/fa";
+import "react-datepicker/dist/react-datepicker.css";
+
+const SLOT_INTERVAL_MINUTES = 30;
+const SCHEDULE_START_TIME = "09:00";
+const SCHEDULE_END_TIME = "18:00";
+const DEFAULT_EMPTY_SLOT_START = "09:00";
+const SCHEDULE_MODES = [
+  { key: "days", label: "Days" },
+  { key: "weeks", label: "Weeks" },
+  { key: "month", label: "Month" },
+];
+
+function RoomScheduleBoard({
+  rooms,
+  bookings,
+  currentUser,
+  selectedDate,
+  onDateChange,
+  fetchBookingsByRoomAndDate,
+}) {
+  const navigate = useNavigate();
+  const [scheduleMode, setScheduleMode] = useState("days");
+  const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
+  const rangePickerRef = useRef(null);
+
+  const timeSlots = useMemo(
+    () =>
+      createTimeSlots(
+        SCHEDULE_START_TIME,
+        SCHEDULE_END_TIME,
+        SLOT_INTERVAL_MINUTES
+      ),
+    []
+  );
+
+  const visibleDates = useMemo(
+    () => getVisibleDates(selectedDate, scheduleMode),
+    [scheduleMode, selectedDate]
+  );
+
+  const dateCards = useMemo(
+    () =>
+      Array.from({ length: 14 }, (_, index) =>
+        addDaysToDateValue(selectedDate, index)
+      ),
+    [selectedDate]
+  );
+
+  const roomIds = useMemo(() => rooms.map((room) => room.id).join("|"), [rooms]);
+  const visibleDateKey = visibleDates.join("|");
+
+  useEffect(() => {
+    if (!selectedDate || rooms.length === 0) return;
+
+    rooms.forEach((room) => {
+      visibleDates.forEach((dateValue) => {
+        fetchBookingsByRoomAndDate(room.id, dateValue);
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roomIds, visibleDateKey]);
+
+  const scheduleBookings = bookings.filter(
+    (booking) =>
+      visibleDates.includes(booking.date) &&
+      booking.status !== "cancelled" &&
+      rooms.some((room) => String(room.id) === String(booking.roomId))
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        rangePickerRef.current &&
+        !rangePickerRef.current.contains(event.target)
+      ) {
+        setIsRangePickerOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    setIsRangePickerOpen(false);
+  }, [scheduleMode]);
+
+  function moveDate(direction) {
+    const nextDate = getMovedDate(selectedDate, direction, scheduleMode);
+    if (nextDate < getTodayDate()) return;
+    onDateChange(nextDate);
+  }
+
+  function handlePickerChange(date) {
+    if (!date) return;
+
+    const nextDate =
+      scheduleMode === "month"
+        ? getSelectableMonthDate(date)
+        : formatDateValue(date);
+
+    if (nextDate < getTodayDate()) return;
+
+    onDateChange(nextDate);
+    setIsRangePickerOpen(false);
+  }
+
+  function handleSlotClick(room, dateValue, startTime = DEFAULT_EMPTY_SLOT_START) {
+    if (isPastSlot(dateValue, startTime)) return;
+
+    navigate(`/book/${room.id}`, {
+      state: {
+        selectedDate: dateValue,
+        startTime,
+        endTime: addMinutesToTime(startTime, SLOT_INTERVAL_MINUTES),
+        openBookingForm: true,
+      },
+    });
+  }
+
+  function handleBookingClick(booking) {
+    navigate(`/book/${booking.roomId}`, {
+      state: {
+        selectedDate: booking.date,
+        startTime: getBookingStartTime(booking),
+        endTime: getBookingEndTime(booking),
+        openBookingForm: true,
+        requestAdmin: !isCurrentUserBooking(booking, currentUser),
+      },
+    });
+  }
+
+  return (
+    <section className="room-schedule-board mb-7 rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 sm:h-11 sm:w-11">
+            <FaCalendarAlt size={17} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">
+              Room Calendar
+            </h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Blue bookings are yours. Gray bookings belong to other users.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-3 sm:flex-row sm:items-center">
+          <div className="inline-flex w-full max-w-md rounded-xl bg-slate-100 p-1 sm:w-fit">
+            {SCHEDULE_MODES.map((mode) => (
+              <button
+                type="button"
+                key={mode.key}
+                onClick={() => setScheduleMode(mode.key)}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition sm:flex-none sm:px-4 ${
+                  scheduleMode === mode.key
+                    ? "bg-blue-100 text-blue-700 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex w-full min-w-0 items-center justify-center gap-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={() => moveDate(-1)}
+              disabled={selectedDate <= getTodayDate()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              aria-label="Previous calendar range"
+            >
+              <FaChevronLeft size={13} />
+            </button>
+
+            <div ref={rangePickerRef} className="relative min-w-0 flex-1 sm:flex-none">
+              <button
+                type="button"
+                onClick={() =>
+                  setIsRangePickerOpen((currentValue) => !currentValue)
+                }
+                className={`flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition sm:w-auto sm:justify-between sm:px-4 ${
+                  isRangePickerOpen
+                    ? "border-blue-500 text-blue-700 ring-2 ring-blue-100"
+                    : "border-gray-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
+                }`}
+                aria-expanded={isRangePickerOpen}
+                aria-label="Open calendar date picker"
+              >
+                <span className="truncate">
+                  {getRangeLabel(selectedDate, scheduleMode, visibleDates)}
+                </span>
+                <FaChevronDown
+                  size={11}
+                  className={`shrink-0 transition-transform ${
+                    isRangePickerOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              {isRangePickerOpen && (
+                <div className="room-range-picker-popover fixed left-1/2 top-28 z-[80] max-h-[calc(100vh-9rem)] w-[calc(100vw-2rem)] -translate-x-1/2 overflow-y-auto rounded-2xl border border-gray-200 bg-white p-3 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-80 sm:max-w-[calc(100vw-2rem)] sm:translate-x-0">
+                  <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {scheduleMode === "month"
+                      ? "Select month"
+                      : "Select date"}
+                  </p>
+                  <DatePicker
+                    selected={parseDateValue(selectedDate)}
+                    onChange={handlePickerChange}
+                    inline
+                    minDate={parseDateValue(getTodayDate())}
+                    showMonthYearPicker={scheduleMode === "month"}
+                  />
+                  <p className="mt-2 px-1 text-xs text-slate-500">
+                    {scheduleMode === "weeks"
+                      ? "Pick any date to start the visible week."
+                      : scheduleMode === "month"
+                        ? "Pick a month to view all room bookings in that month."
+                        : "Pick a date to view the day schedule."}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => moveDate(1)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition hover:bg-slate-50"
+              aria-label="Next calendar range"
+            >
+              <FaChevronRight size={13} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-gray-100 bg-slate-50/60 px-3 py-4 sm:px-6">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => moveDate(-1)}
+            disabled={selectedDate <= getTodayDate()}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-blue-100"
+            aria-label="Previous date"
+          >
+            <FaChevronLeft size={13} />
+          </button>
+
+          <div className="room-date-strip flex flex-1 gap-3 overflow-x-auto pb-1">
+            {dateCards.map((dateValue) => (
+              <button
+                type="button"
+                key={dateValue}
+                onClick={() => onDateChange(dateValue)}
+                className={`min-w-[76px] rounded-xl border px-3 py-3 text-center transition sm:min-w-28 sm:px-4 ${
+                  dateValue === selectedDate
+                    ? "border-blue-200 bg-blue-100 text-blue-700"
+                    : "border-gray-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                }`}
+              >
+                <span className="block text-xs font-semibold">
+                  {formatDatePart(dateValue, "weekday")}
+                </span>
+                <span className="mt-1 block text-2xl font-bold text-slate-950">
+                  {formatDatePart(dateValue, "day")}
+                </span>
+                <span className="block text-xs font-semibold">
+                  {formatDatePart(dateValue, "month")}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => moveDate(1)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 transition hover:bg-blue-50"
+            aria-label="Next date"
+          >
+            <FaChevronRight size={13} />
+          </button>
+        </div>
+      </div>
+
+      <div className="room-schedule-scroll overflow-x-auto">
+        {scheduleMode === "days" ? (
+        <div className="min-w-full">
+          <div
+            className="grid border-b border-gray-200 bg-slate-50"
+            style={{
+              gridTemplateColumns: `var(--schedule-room-column) repeat(${timeSlots.length}, var(--schedule-time-column))`,
+            }}
+          >
+            <div className="sticky left-0 z-30 border-r border-gray-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-800 sm:px-5">
+              Rooms
+            </div>
+            {timeSlots.map((slot) => (
+              <div
+                key={slot}
+                className="border-r border-gray-200 px-2 py-3 text-sm font-semibold leading-tight text-slate-700 last:border-r-0 sm:px-3"
+              >
+                {formatTime(slot)}
+              </div>
+            ))}
+          </div>
+
+          {rooms.map((room) => {
+            const roomBookings = scheduleBookings.filter(
+              (booking) =>
+                String(booking.roomId) === String(room.id) &&
+                booking.date === selectedDate
+            );
+
+            return (
+              <div
+                key={room.id}
+                className="grid border-b border-gray-100 last:border-b-0"
+                style={{
+                  gridTemplateColumns: `var(--schedule-room-column) repeat(${timeSlots.length}, var(--schedule-time-column))`,
+                }}
+              >
+                <div className="sticky left-0 z-20 border-r border-gray-200 bg-white px-3 py-4 sm:px-5 sm:py-5">
+                  <p className="break-words text-sm font-bold text-slate-900">{room.name}</p>
+                  <p className="mt-1 break-words text-xs font-medium text-slate-500">
+                    {room.location}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-400">
+                    {room.capacity} people
+                  </p>
+                </div>
+
+                <div
+                  className="grid min-h-28"
+                  style={{
+                    gridColumn: `2 / ${timeSlots.length + 2}`,
+                    gridTemplateColumns: `repeat(${timeSlots.length}, var(--schedule-time-column))`,
+                    gridTemplateRows: "112px",
+                  }}
+                >
+                  {timeSlots.map((slot, index) => {
+                    const disabled = isPastSlot(selectedDate, slot);
+
+                    return (
+                      <button
+                        type="button"
+                        key={`${room.id}-${slot}`}
+                        onClick={() => handleSlotClick(room, selectedDate, slot)}
+                        disabled={disabled}
+                        className={`border-r border-gray-100 transition last:border-r-0 ${
+                          disabled
+                            ? "cursor-not-allowed bg-slate-50"
+                            : "bg-white hover:bg-blue-50"
+                        }`}
+                        style={{ gridColumn: index + 1, gridRow: 1 }}
+                        title={
+                          disabled
+                            ? "Past time"
+                            : `Book ${room.name} at ${formatTime(slot)}`
+                        }
+                      />
+                    );
+                  })}
+
+                  {roomBookings.map((booking) => {
+                    const isMine = isCurrentUserBooking(booking, currentUser);
+                    const gridColumn = getBookingGridColumn(
+                      booking,
+                      timeSlots
+                    );
+
+                    if (!gridColumn) return null;
+
+                    return (
+                      <button
+                        type="button"
+                        key={booking.id}
+                        onClick={() => handleBookingClick(booking)}
+                        className={`z-10 m-2 self-center rounded-xl px-3 py-2 text-left text-white shadow-sm transition hover:brightness-95 ${
+                          isMine ? "bg-blue-600" : "bg-slate-500"
+                        }`}
+                        style={{ gridColumn, gridRow: 1 }}
+                        title="Open booking"
+                      >
+                        <span className="block truncate text-xs font-bold">
+                          {isMine ? "Your booking" : booking.bookedBy || "Booked"}
+                        </span>
+                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium opacity-90">
+                          <FaClock size={10} />
+                          {formatTime(getBookingStartTime(booking))} -{" "}
+                          {formatTime(getBookingEndTime(booking))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        ) : (
+          <DateRangeGrid
+            rooms={rooms}
+            visibleDates={visibleDates}
+            scheduleBookings={scheduleBookings}
+            currentUser={currentUser}
+            onSlotClick={handleSlotClick}
+            onBookingClick={handleBookingClick}
+          />
+        )}
+      </div>
+
+      <style>
+        {`
+          .room-schedule-board {
+            --schedule-room-column: 144px;
+            --schedule-time-column: 64px;
+            --schedule-date-column: 96px;
+          }
+
+          @media (min-width: 640px) {
+            .room-schedule-board {
+              --schedule-room-column: 220px;
+              --schedule-time-column: 74px;
+              --schedule-date-column: 132px;
+            }
+          }
+
+          .room-date-strip {
+            scrollbar-width: none;
+          }
+
+          .room-date-strip::-webkit-scrollbar {
+            display: none;
+          }
+
+          .room-schedule-scroll {
+            scrollbar-width: thin;
+          }
+
+          .room-range-picker-popover .react-datepicker {
+            width: 100%;
+            border: 0;
+            font-family: inherit;
+          }
+
+          .room-range-picker-popover .react-datepicker__month-container {
+            width: 100%;
+            float: none;
+          }
+
+          .room-range-picker-popover .react-datepicker__header {
+            border-bottom-color: #e5e7eb;
+            background: #f8fafc;
+          }
+
+          .room-range-picker-popover .react-datepicker__month-wrapper {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+          }
+
+          .room-range-picker-popover .react-datepicker__month-text {
+            width: auto;
+            margin: 0.2rem;
+            border-radius: 0.75rem;
+            padding: 0.45rem 0.25rem;
+          }
+
+          .room-range-picker-popover .react-datepicker__day-name,
+          .room-range-picker-popover .react-datepicker__day {
+            width: 2rem;
+            line-height: 2rem;
+            margin: 0.08rem;
+          }
+
+          @media (max-width: 639px) {
+            .room-schedule-board {
+              --schedule-room-column: 164px;
+              --schedule-time-column: 68px;
+              --schedule-date-column: 112px;
+            }
+
+            .room-range-picker-popover .react-datepicker__month-wrapper {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .room-range-picker-popover .react-datepicker__day-name,
+            .room-range-picker-popover .react-datepicker__day {
+              width: 1.9rem;
+              line-height: 1.9rem;
+            }
+
+            .room-range-picker-popover .react-datepicker__current-month,
+            .room-range-picker-popover .react-datepicker-year-header {
+              font-size: 0.95rem;
+            }
+          }
+        `}
+      </style>
+    </section>
+  );
+}
+
+function DateRangeGrid({
+  rooms,
+  visibleDates,
+  scheduleBookings,
+  currentUser,
+  onSlotClick,
+  onBookingClick,
+}) {
+  return (
+    <div
+      className="min-w-full"
+    >
+      <div
+        className="grid border-b border-gray-200 bg-slate-50"
+        style={{
+          gridTemplateColumns: `var(--schedule-room-column) repeat(${visibleDates.length}, var(--schedule-date-column))`,
+        }}
+      >
+        <div className="sticky left-0 z-30 border-r border-gray-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-800 sm:px-5">
+          Rooms
+        </div>
+        {visibleDates.map((dateValue) => (
+          <div
+            key={dateValue}
+            className={`border-r border-gray-200 px-3 py-3 text-sm font-semibold last:border-r-0 ${
+              dateValue === getTodayDate() ? "text-blue-700" : "text-slate-700"
+            }`}
+          >
+            <span className="block truncate">
+              {formatDatePart(dateValue, "weekday")}
+            </span>
+            <span className="block truncate text-xs font-medium text-slate-500">
+              {formatDatePart(dateValue, "day")} {formatDatePart(dateValue, "month")}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {rooms.map((room) => (
+        <div
+          key={room.id}
+          className="grid border-b border-gray-100 last:border-b-0"
+          style={{
+            gridTemplateColumns: `var(--schedule-room-column) repeat(${visibleDates.length}, var(--schedule-date-column))`,
+          }}
+        >
+          <div className="sticky left-0 z-20 border-r border-gray-200 bg-white px-3 py-4 sm:px-5 sm:py-5">
+            <p className="break-words text-sm font-bold text-slate-900">{room.name}</p>
+            <p className="mt-1 break-words text-xs font-medium text-slate-500">
+              {room.location}
+            </p>
+            <p className="mt-2 text-xs text-slate-400">{room.capacity} people</p>
+          </div>
+
+          {visibleDates.map((dateValue) => {
+            const dayBookings = scheduleBookings.filter(
+              (booking) =>
+                String(booking.roomId) === String(room.id) &&
+                booking.date === dateValue
+            );
+            const disabled = isPastSlot(dateValue, DEFAULT_EMPTY_SLOT_START);
+
+            return (
+              <div
+                key={`${room.id}-${dateValue}`}
+                role="button"
+                tabIndex={disabled ? -1 : 0}
+                onClick={() =>
+                  !disabled &&
+                  onSlotClick(room, dateValue, DEFAULT_EMPTY_SLOT_START)
+                }
+                onKeyDown={(event) => {
+                  if (!disabled && (event.key === "Enter" || event.key === " ")) {
+                    onSlotClick(room, dateValue, DEFAULT_EMPTY_SLOT_START);
+                  }
+                }}
+                className={`min-h-28 border-r border-gray-100 p-2 last:border-r-0 ${
+                  disabled
+                    ? "cursor-not-allowed bg-slate-50"
+                    : "cursor-pointer bg-white hover:bg-blue-50"
+                }`}
+                title={disabled ? "Past date" : `Book ${room.name}`}
+              >
+                <div className="space-y-2">
+                  {dayBookings.map((booking) => {
+                    const isMine = isCurrentUserBooking(booking, currentUser);
+
+                    return (
+                      <button
+                        type="button"
+                        key={booking.id}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onBookingClick(booking);
+                        }}
+                        className={`w-full rounded-lg px-2.5 py-2 text-left text-white shadow-sm transition hover:brightness-95 ${
+                          isMine ? "bg-blue-600" : "bg-slate-500"
+                        }`}
+                      >
+                        <span className="block truncate text-xs font-bold">
+                          {isMine ? "Your booking" : booking.bookedBy || "Booked"}
+                        </span>
+                        <span className="mt-1 block truncate text-[11px] font-medium opacity-90">
+                          {formatTime(getBookingStartTime(booking))} -{" "}
+                          {formatTime(getBookingEndTime(booking))}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function createTimeSlots(start, end, intervalMinutes) {
+  const startMinutes = convertTimeToMinutes(start);
+  const endMinutes = convertTimeToMinutes(end);
+  const slots = [];
+
+  for (
+    let minutes = startMinutes;
+    minutes < endMinutes;
+    minutes += intervalMinutes
+  ) {
+    slots.push(minutesToTimeValue(minutes));
+  }
+
+  return slots;
+}
+
+function getVisibleDates(selectedDate, scheduleMode) {
+  if (scheduleMode === "month") {
+    const selected = parseDateValue(selectedDate);
+    const year = selected.getFullYear();
+    const month = selected.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDate =
+      formatDateValue(firstDay) < getTodayDate()
+        ? parseDateValue(getTodayDate())
+        : firstDay;
+    const dates = [];
+
+    for (
+      let date = new Date(startDate);
+      date <= lastDay;
+      date.setDate(date.getDate() + 1)
+    ) {
+      dates.push(formatDateValue(date));
+    }
+
+    return dates;
+  }
+
+  const daysToShow = scheduleMode === "weeks" ? 7 : 1;
+
+  return Array.from({ length: daysToShow }, (_, index) =>
+    addDaysToDateValue(selectedDate, index)
+  );
+}
+
+function getMovedDate(selectedDate, direction, scheduleMode) {
+  if (scheduleMode === "month") {
+    return addMonthsToDateValue(selectedDate, direction);
+  }
+
+  return addDaysToDateValue(selectedDate, scheduleMode === "weeks" ? 7 * direction : direction);
+}
+
+function getRangeLabel(selectedDate, scheduleMode, visibleDates) {
+  if (scheduleMode === "days") {
+    return parseDateValue(selectedDate).toLocaleDateString("en-IN", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }
+
+  if (scheduleMode === "month") {
+    return parseDateValue(selectedDate).toLocaleDateString("en-IN", {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  return formatDateRange(visibleDates[0], visibleDates[visibleDates.length - 1]);
+}
+
+function getTodayDate() {
+  const currentDate = new Date();
+  const year = currentDate.getFullYear();
+  const month = String(currentDate.getMonth() + 1).padStart(2, "0");
+  const day = String(currentDate.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateValue(dateValue) {
+  const [year, month, day] = dateValue.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function addDaysToDateValue(dateValue, daysToAdd) {
+  const date = parseDateValue(dateValue);
+  date.setDate(date.getDate() + daysToAdd);
+
+  return formatDateValue(date);
+}
+
+function addMonthsToDateValue(dateValue, monthsToAdd) {
+  const date = parseDateValue(dateValue);
+  date.setMonth(date.getMonth() + monthsToAdd, 1);
+
+  const dateValueForMonth = formatDateValue(date);
+
+  return dateValueForMonth < getTodayDate() ? getTodayDate() : dateValueForMonth;
+}
+
+function getSelectableMonthDate(date) {
+  const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  const monthDateValue = formatDateValue(firstDayOfMonth);
+
+  return monthDateValue < getTodayDate() ? getTodayDate() : monthDateValue;
+}
+
+function formatDateValue(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDatePart(dateValue, part) {
+  const options = {
+    weekday: { weekday: "short" },
+    day: { day: "numeric" },
+    month: { month: "short" },
+  };
+
+  return parseDateValue(dateValue).toLocaleDateString("en-IN", options[part]);
+}
+
+function formatDateRange(startDate, endDate) {
+  const start = parseDateValue(startDate).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+  const end = parseDateValue(endDate).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+
+  return `${start} - ${end}`;
+}
+
+function minutesToTimeValue(totalMinutes) {
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
+
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function convertTimeToMinutes(timeValue) {
+  if (!timeValue) return 0;
+
+  const cleanTime = String(timeValue).trim().toUpperCase();
+
+  if (cleanTime.includes("AM") || cleanTime.includes("PM")) {
+    const period = cleanTime.includes("PM") ? "PM" : "AM";
+    const timeOnly = cleanTime.replace("AM", "").replace("PM", "").trim();
+    let [hour, minute] = timeOnly.split(":").map(Number);
+
+    if (period === "PM" && hour !== 12) hour += 12;
+    if (period === "AM" && hour === 12) hour = 0;
+
+    return hour * 60 + (minute || 0);
+  }
+
+  const [hour, minute] = cleanTime.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function addMinutesToTime(timeValue, minutesToAdd) {
+  return minutesToTimeValue(convertTimeToMinutes(timeValue) + minutesToAdd);
+}
+
+function formatTime(timeValue) {
+  if (!timeValue) return "";
+
+  const [hour, minute] = timeValue.split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+
+  return `${String(displayHour).padStart(2, "0")}:${String(minute).padStart(
+    2,
+    "0"
+  )} ${period}`;
+}
+
+function getBookingStartTime(booking) {
+  return booking.startTime || booking.slot?.split("-")[0]?.trim() || "";
+}
+
+function getBookingEndTime(booking) {
+  return booking.endTime || booking.slot?.split("-")[1]?.trim() || "";
+}
+
+function isCurrentUserBooking(booking, currentUser) {
+  const currentUserId = String(currentUser?.id || currentUser?._id || "");
+  const bookingUserId = String(
+    booking?.userId?._id || booking?.userId?.id || booking?.userId || ""
+  );
+  const currentUserEmail = String(currentUser?.email || "").toLowerCase();
+  const bookingUserEmail = String(
+    booking?.userEmail || booking?.userId?.email || ""
+  ).toLowerCase();
+
+  return (
+    (currentUserId && bookingUserId === currentUserId) ||
+    (currentUserEmail && bookingUserEmail === currentUserEmail)
+  );
+}
+
+function isPastSlot(dateValue, startTime) {
+  if (dateValue !== getTodayDate()) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return convertTimeToMinutes(startTime) <= currentMinutes;
+}
+
+function getBookingGridColumn(booking, timeSlots) {
+  const start = getBookingStartTime(booking);
+  const end = getBookingEndTime(booking);
+
+  if (!start || !end) return null;
+
+  const gridStartMinutes = convertTimeToMinutes(timeSlots[0]);
+  const gridEndMinutes =
+    convertTimeToMinutes(timeSlots[timeSlots.length - 1]) + SLOT_INTERVAL_MINUTES;
+  const bookingStart = convertTimeToMinutes(start);
+  const bookingEnd = convertTimeToMinutes(end);
+
+  if (bookingEnd <= gridStartMinutes || bookingStart >= gridEndMinutes) {
+    return null;
+  }
+
+  const startIndex = Math.max(
+    0,
+    Math.floor((bookingStart - gridStartMinutes) / SLOT_INTERVAL_MINUTES)
+  );
+  const endIndex = Math.min(
+    timeSlots.length,
+    Math.ceil((bookingEnd - gridStartMinutes) / SLOT_INTERVAL_MINUTES)
+  );
+
+  return `${startIndex + 1} / ${Math.max(startIndex + 2, endIndex + 1)}`;
+}
+
+export default RoomScheduleBoard;
