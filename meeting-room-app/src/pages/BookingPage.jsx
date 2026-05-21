@@ -102,6 +102,14 @@ function BookingPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedRoom?.id, selectedDate]);
 
+  useEffect(() => {
+    if (!location.state?.openBookingForm) return;
+
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [location.state?.openBookingForm]);
+
   // ── room not found ────────────────────────────────────────────────────────
   if (!selectedRoom) {
     return (

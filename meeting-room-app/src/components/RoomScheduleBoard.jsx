@@ -11,8 +11,8 @@ import {
 import "react-datepicker/dist/react-datepicker.css";
 
 const SLOT_INTERVAL_MINUTES = 30;
-const SCHEDULE_START_TIME = "09:00";
-const SCHEDULE_END_TIME = "18:00";
+const SCHEDULE_START_TIME = "00:00";
+const SCHEDULE_END_TIME = "24:00";
 const DEFAULT_EMPTY_SLOT_START = "09:00";
 const SCHEDULE_MODES = [
   { key: "days", label: "Days" },
@@ -148,13 +148,32 @@ function RoomScheduleBoard({
   }
 
   function handleBookingClick(booking) {
-    navigate(`/book/${booking.roomId}`, {
+    if (isPastBooking(booking)) return;
+
+    if (!isCurrentUserBooking(booking, currentUser)) return;
+
+    navigate("/mybookings", {
       state: {
-        selectedDate: booking.date,
-        startTime: getBookingStartTime(booking),
-        endTime: getBookingEndTime(booking),
+        bookingId: booking.id || booking._id,
+      },
+    });
+  }
+
+  function handleMonthDateSelect(dateValue) {
+    if (dateValue < getTodayDate()) return;
+
+    const entryRoom =
+      rooms.find((room) => room.status === "available" && room.isActive) ||
+      rooms[0];
+
+    if (!entryRoom?.id) return;
+
+    navigate(`/book/${entryRoom.id}`, {
+      state: {
+        selectedDate: dateValue,
+        startTime: "",
+        endTime: "",
         openBookingForm: true,
-        requestAdmin: !isCurrentUserBooking(booking, currentUser),
       },
     });
   }
@@ -266,53 +285,55 @@ function RoomScheduleBoard({
         </div>
       </div>
 
-      <div className="border-b border-gray-100 bg-slate-50/60 px-3 py-4 sm:px-6">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => moveDate(-1)}
-            disabled={selectedDate <= getTodayDate()}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-blue-100"
-            aria-label="Previous date"
-          >
-            <FaChevronLeft size={13} />
-          </button>
+      {scheduleMode !== "month" && (
+        <div className="border-b border-gray-100 bg-slate-50/60 px-3 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => moveDate(-1)}
+              disabled={selectedDate <= getTodayDate()}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-blue-100"
+              aria-label="Previous date"
+            >
+              <FaChevronLeft size={13} />
+            </button>
 
-          <div className="room-date-strip flex flex-1 gap-3 overflow-x-auto pb-1">
-            {dateCards.map((dateValue) => (
-              <button
-                type="button"
-                key={dateValue}
-                onClick={() => onDateChange(dateValue)}
-                className={`min-w-[76px] rounded-xl border px-3 py-3 text-center transition sm:min-w-28 sm:px-4 ${
-                  dateValue === selectedDate
-                    ? "border-blue-200 bg-blue-100 text-blue-700"
-                    : "border-gray-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50"
-                }`}
-              >
-                <span className="block text-xs font-semibold">
-                  {formatDatePart(dateValue, "weekday")}
-                </span>
-                <span className="mt-1 block text-2xl font-bold text-slate-950">
-                  {formatDatePart(dateValue, "day")}
-                </span>
-                <span className="block text-xs font-semibold">
-                  {formatDatePart(dateValue, "month")}
-                </span>
-              </button>
-            ))}
+            <div className="room-date-strip flex flex-1 gap-3 overflow-x-auto pb-1">
+              {dateCards.map((dateValue) => (
+                <button
+                  type="button"
+                  key={dateValue}
+                  onClick={() => onDateChange(dateValue)}
+                  className={`min-w-[76px] rounded-xl border px-3 py-3 text-center transition sm:min-w-28 sm:px-4 ${
+                    dateValue === selectedDate
+                      ? "border-blue-200 bg-blue-100 text-blue-700"
+                      : "border-gray-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                  }`}
+                >
+                  <span className="block text-xs font-semibold">
+                    {formatDatePart(dateValue, "weekday")}
+                  </span>
+                  <span className="mt-1 block text-2xl font-bold text-slate-950">
+                    {formatDatePart(dateValue, "day")}
+                  </span>
+                  <span className="block text-xs font-semibold">
+                    {formatDatePart(dateValue, "month")}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => moveDate(1)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 transition hover:bg-blue-50"
+              aria-label="Next date"
+            >
+              <FaChevronRight size={13} />
+            </button>
           </div>
-
-          <button
-            type="button"
-            onClick={() => moveDate(1)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 transition hover:bg-blue-50"
-            aria-label="Next date"
-          >
-            <FaChevronRight size={13} />
-          </button>
         </div>
-      </div>
+      )}
 
       <div className="room-schedule-scroll overflow-x-auto">
         {scheduleMode === "days" ? (
@@ -409,6 +430,7 @@ function RoomScheduleBoard({
 
                   {roomBookings.map((booking) => {
                     const isMine = isCurrentUserBooking(booking, currentUser);
+                    const canOpenBooking = isMine && !isPastBooking(booking);
                     const gridColumn = getBookingGridColumn(
                       booking,
                       timeSlots
@@ -420,12 +442,27 @@ function RoomScheduleBoard({
                       <button
                         type="button"
                         key={booking.id}
-                        onClick={() => handleBookingClick(booking)}
-                        className={`z-10 m-2 self-center rounded-xl px-3 py-2 text-left text-white shadow-sm transition hover:brightness-95 ${
+                        onClick={() => {
+                          if (canOpenBooking) {
+                            handleBookingClick(booking);
+                          }
+                        }}
+                        aria-disabled={!canOpenBooking}
+                        className={`z-10 m-2 self-center rounded-xl px-3 py-2 text-left text-white shadow-sm transition ${
                           isMine ? "bg-blue-600" : "bg-slate-500"
+                        } ${
+                          canOpenBooking
+                            ? "cursor-pointer hover:brightness-95"
+                            : "cursor-default"
                         }`}
                         style={{ gridColumn, gridRow: 1 }}
-                        title="Open booking"
+                        title={
+                          canOpenBooking
+                            ? "Open in My Bookings"
+                            : isPastBooking(booking)
+                              ? "Past booking"
+                              : "Other user's booking"
+                        }
                       >
                         <span className="block truncate text-xs font-bold">
                           {isMine ? "Your booking" : booking.bookedBy || "Booked"}
@@ -443,6 +480,15 @@ function RoomScheduleBoard({
             );
           })}
         </div>
+        ) : scheduleMode === "month" ? (
+          <MonthCalendarGrid
+            selectedDate={selectedDate}
+            rooms={rooms}
+            scheduleBookings={scheduleBookings}
+            currentUser={currentUser}
+            onBookingClick={handleBookingClick}
+            onDateSelect={handleMonthDateSelect}
+          />
         ) : (
           <DateRangeGrid
             rooms={rooms}
@@ -632,6 +678,7 @@ function DateRangeGrid({
                 <div className="space-y-2">
                   {dayBookings.map((booking) => {
                     const isMine = isCurrentUserBooking(booking, currentUser);
+                    const canOpenBooking = isMine && !isPastBooking(booking);
 
                     return (
                       <button
@@ -639,11 +686,25 @@ function DateRangeGrid({
                         key={booking.id}
                         onClick={(event) => {
                           event.stopPropagation();
-                          onBookingClick(booking);
+                          if (canOpenBooking) {
+                            onBookingClick(booking);
+                          }
                         }}
-                        className={`w-full rounded-lg px-2.5 py-2 text-left text-white shadow-sm transition hover:brightness-95 ${
+                        aria-disabled={!canOpenBooking}
+                        className={`w-full rounded-lg px-2.5 py-2 text-left text-white shadow-sm transition ${
                           isMine ? "bg-blue-600" : "bg-slate-500"
+                        } ${
+                          canOpenBooking
+                            ? "cursor-pointer hover:brightness-95"
+                            : "cursor-default"
                         }`}
+                        title={
+                          canOpenBooking
+                            ? "Open in My Bookings"
+                            : isPastBooking(booking)
+                              ? "Past booking"
+                              : "Other user's booking"
+                        }
                       >
                         <span className="block truncate text-xs font-bold">
                           {isMine ? "Your booking" : booking.bookedBy || "Booked"}
@@ -661,6 +722,150 @@ function DateRangeGrid({
           })}
         </div>
       ))}
+    </div>
+  );
+}
+
+function MonthCalendarGrid({
+  selectedDate,
+  rooms,
+  scheduleBookings,
+  currentUser,
+  onBookingClick,
+  onDateSelect,
+}) {
+  const monthDates = getMonthCalendarDates(selectedDate);
+  const selectedMonth = parseDateValue(selectedDate).getMonth();
+  const roomById = new Map(rooms.map((room) => [String(room.id), room]));
+
+  return (
+    <div className="bg-white">
+      <div className="grid min-w-[860px] grid-cols-7 border-b border-gray-200 bg-slate-50 lg:min-w-0">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((weekday) => (
+          <div
+            key={weekday}
+            className="border-r border-gray-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
+          >
+            {weekday}
+          </div>
+        ))}
+      </div>
+
+      <div className="grid min-w-[860px] grid-cols-7 lg:min-w-0">
+        {monthDates.map((dateValue) => {
+          const date = parseDateValue(dateValue);
+          const isCurrentMonth = date.getMonth() === selectedMonth;
+          const isToday = dateValue === getTodayDate();
+          const isSelectableDate = dateValue >= getTodayDate();
+          const dayBookings = scheduleBookings.filter(
+            (booking) => booking.date === dateValue
+          );
+
+          return (
+            <div
+              key={dateValue}
+              role="button"
+              tabIndex={isSelectableDate ? 0 : -1}
+              onClick={() => {
+                if (isSelectableDate) {
+                  onDateSelect(dateValue);
+                }
+              }}
+              onKeyDown={(event) => {
+                if (
+                  isSelectableDate &&
+                  (event.key === "Enter" || event.key === " ")
+                ) {
+                  event.preventDefault();
+                  onDateSelect(dateValue);
+                }
+              }}
+              className={`min-h-36 border-r border-b border-gray-100 p-2 last:border-r-0 ${
+                isCurrentMonth ? "bg-white" : "bg-slate-50/70"
+              } ${
+                isSelectableDate
+                  ? "cursor-pointer transition hover:bg-blue-50"
+                  : "cursor-not-allowed"
+              }`}
+              title={
+                isSelectableDate
+                  ? "Open day calendar"
+                  : "Past date"
+              }
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <span
+                  className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
+                    isToday
+                      ? "bg-blue-600 text-white"
+                      : isCurrentMonth
+                        ? "text-slate-800"
+                        : "text-slate-300"
+                  }`}
+                >
+                  {date.getDate()}
+                </span>
+
+                {dayBookings.length > 0 && (
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                    {dayBookings.length}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                {dayBookings.slice(0, 3).map((booking) => {
+                  const isMine = isCurrentUserBooking(booking, currentUser);
+                  const canOpenBooking = isMine && !isPastBooking(booking);
+                  const room = roomById.get(String(booking.roomId));
+
+                  return (
+                    <button
+                      type="button"
+                      key={booking.id || booking._id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (canOpenBooking) {
+                          onBookingClick(booking);
+                        }
+                      }}
+                      aria-disabled={!canOpenBooking}
+                      className={`w-full rounded-lg px-2 py-1.5 text-left text-white shadow-sm transition ${
+                        isMine ? "bg-blue-600" : "bg-slate-500"
+                      } ${
+                        canOpenBooking
+                          ? "cursor-pointer hover:brightness-95"
+                          : "cursor-default"
+                      }`}
+                      title={
+                        canOpenBooking
+                          ? "Open in My Bookings"
+                          : isPastBooking(booking)
+                            ? "Past booking"
+                            : "Other user's booking"
+                      }
+                    >
+                      <span className="block truncate text-[11px] font-bold">
+                        {room?.name || booking.roomName || "Meeting room"}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[10px] font-medium opacity-90">
+                        {formatTime(getBookingStartTime(booking))} -{" "}
+                        {formatTime(getBookingEndTime(booking))}
+                      </span>
+                    </button>
+                  );
+                })}
+
+                {dayBookings.length > 3 && (
+                  <div className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+                    +{dayBookings.length - 3} more
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -688,14 +893,10 @@ function getVisibleDates(selectedDate, scheduleMode) {
     const month = selected.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startDate =
-      formatDateValue(firstDay) < getTodayDate()
-        ? parseDateValue(getTodayDate())
-        : firstDay;
     const dates = [];
 
     for (
-      let date = new Date(startDate);
+      let date = new Date(firstDay);
       date <= lastDay;
       date.setDate(date.getDate() + 1)
     ) {
@@ -710,6 +911,28 @@ function getVisibleDates(selectedDate, scheduleMode) {
   return Array.from({ length: daysToShow }, (_, index) =>
     addDaysToDateValue(selectedDate, index)
   );
+}
+
+function getMonthCalendarDates(selectedDate) {
+  const selected = parseDateValue(selectedDate);
+  const firstDay = new Date(selected.getFullYear(), selected.getMonth(), 1);
+  const lastDay = new Date(selected.getFullYear(), selected.getMonth() + 1, 0);
+  const startDate = new Date(firstDay);
+  const endDate = new Date(lastDay);
+  const dates = [];
+
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+  endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
+
+  for (
+    let date = new Date(startDate);
+    date <= endDate;
+    date.setDate(date.getDate() + 1)
+  ) {
+    dates.push(formatDateValue(date));
+  }
+
+  return dates;
 }
 
 function getMovedDate(selectedDate, direction, scheduleMode) {
@@ -837,7 +1060,9 @@ function convertTimeToMinutes(timeValue) {
 }
 
 function addMinutesToTime(timeValue, minutesToAdd) {
-  return minutesToTimeValue(convertTimeToMinutes(timeValue) + minutesToAdd);
+  const totalMinutes = convertTimeToMinutes(timeValue) + minutesToAdd;
+
+  return minutesToTimeValue(Math.min(totalMinutes, 24 * 60 - 1));
 }
 
 function getCurrentTimeIndicator(currentTime, selectedDate) {
@@ -861,6 +1086,22 @@ function getCurrentTimeIndicator(currentTime, selectedDate) {
         (scheduleEndMinutes - scheduleStartMinutes)) *
       100,
   };
+}
+
+function isPastBooking(booking) {
+  if (!booking?.date) return false;
+
+  const today = getTodayDate();
+  if (booking.date < today) return true;
+  if (booking.date > today) return false;
+
+  const bookingEndTime = getBookingEndTime(booking) || getBookingStartTime(booking);
+  if (!bookingEndTime) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return convertTimeToMinutes(bookingEndTime) <= currentMinutes;
 }
 
 function formatTime(timeValue) {

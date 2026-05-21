@@ -34,6 +34,29 @@ const CAPACITY_OPTIONS = [
   { key: "xlarge", label: "20+", minCapacity: 20, maxCapacity: Infinity },
 ];
 
+const RECOMMENDED_SLOT_INTERVAL = 30;
+const RECOMMENDED_DAY_START_MINUTES = 9 * 60;
+const RECOMMENDED_SLOT_PRESETS = [
+  {
+    key: "thirty",
+    title: "30 min",
+    description: "Quick sync",
+    durationMinutes: 30,
+  },
+  {
+    key: "sixty",
+    title: "1 hour",
+    description: "Standard meeting",
+    durationMinutes: 60,
+  },
+  {
+    key: "two-hour",
+    title: "2 hours",
+    description: "Workshop block",
+    durationMinutes: 120,
+  },
+];
+
 function RoomsPage() {
   const {
     rooms,
@@ -46,7 +69,7 @@ function RoomsPage() {
   const [searchText, setSearchText] = useState("");
   const [scheduleDate, setScheduleDate] = useState(getTodayDate());
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
-  const [startTime, setStartTime] = useState("");
+  const [startTime, setStartTime] = useState(() => getCurrentRoundedTime());
   const [endTime, setEndTime] = useState("");
   const [capacityKey, setCapacityKey] = useState("");
   const [floorFilter, setFloorFilter] = useState("");
@@ -89,6 +112,22 @@ function RoomsPage() {
     return dateValue === getTodayDate() ? getCurrentRoundedTime() : "";
   }
 
+  function getDateOffset(dateValue, dayOffset) {
+    const nextDate = new Date(`${dateValue}T00:00:00`);
+    nextDate.setDate(nextDate.getDate() + dayOffset);
+
+    const year = nextDate.getFullYear();
+    const month = String(nextDate.getMonth() + 1).padStart(2, "0");
+    const day = String(nextDate.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  function roundUpToSlotInterval(totalMinutes) {
+    return Math.ceil(totalMinutes / RECOMMENDED_SLOT_INTERVAL) *
+      RECOMMENDED_SLOT_INTERVAL;
+  }
+
   function convertTimeToMinutes(timeValue) {
     if (!timeValue) return 0;
 
@@ -120,6 +159,19 @@ function RoomsPage() {
       2,
       "0"
     )} ${period}`;
+  }
+
+  function formatSlotDateLabel(dateValue) {
+    const today = getTodayDate();
+    const tomorrow = getDateOffset(today, 1);
+
+    if (dateValue === today) return "Today";
+    if (dateValue === tomorrow) return "Tomorrow";
+
+    return new Date(`${dateValue}T00:00:00`).toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+    });
   }
 
   function addMinutesToTime(timeValue, minutesToAdd) {
@@ -314,6 +366,16 @@ function RoomsPage() {
     setHasSubmittedAvailability(false);
   }
 
+  function handleRecommendedSlotSelect(slot) {
+    if (slot.disabled) return;
+
+    setSelectedDate(slot.date);
+    setStartTime(slot.start);
+    setEndTime(slot.end);
+    setFormErrorMessage("");
+    setHasSubmittedAvailability(false);
+  }
+
   function handleDateChange(date) {
     const minimumTime = getMinimumStartTimeForDate(date);
     const shouldClearTimes =
@@ -334,7 +396,7 @@ function RoomsPage() {
   function clearFilters() {
     setSearchText("");
     setSelectedDate(getTodayDate());
-    setStartTime("");
+    setStartTime(getCurrentRoundedTime());
     setEndTime("");
     setCapacityKey("");
     setFloorFilter("");
@@ -495,6 +557,65 @@ function RoomsPage() {
       ? `${formatTime(startTime)} - ${formatTime(endTime)}`
       : "";
 
+  const recommendedSlots = (() => {
+    const minimumTimeForDate = getMinimumStartTimeForDate(selectedDate);
+    const minimumStartMinutes = minimumTimeForDate
+      ? convertTimeToMinutes(minimumTimeForDate)
+      : RECOMMENDED_DAY_START_MINUTES;
+    const hasSelectedStartTime = Boolean(startTime);
+    const selectedStartMinutes = hasSelectedStartTime
+      ? convertTimeToMinutes(startTime)
+      : null;
+    const baseMinimumMinutes = minimumTimeForDate
+      ? minimumStartMinutes
+      : RECOMMENDED_DAY_START_MINUTES;
+    const baseMinutes = hasSelectedStartTime
+      ? Math.max(selectedStartMinutes, baseMinimumMinutes)
+      : Math.max(roundUpToSlotInterval(minimumStartMinutes), baseMinimumMinutes);
+
+    const standardSlots = RECOMMENDED_SLOT_PRESETS.map((preset) => {
+      const slotStart = baseMinutes;
+      const slotEnd = slotStart + preset.durationMinutes;
+      const isAfterDayEnd = slotEnd >= 24 * 60;
+
+      return {
+        key: `${selectedDate}-${preset.key}-${slotStart}`,
+        date: selectedDate,
+        title: preset.title,
+        description: isAfterDayEnd
+          ? "Choose an earlier start"
+          : preset.description,
+        start: minutesToTimeValue(slotStart),
+        end: isAfterDayEnd ? "" : minutesToTimeValue(slotEnd),
+        disabled: isAfterDayEnd,
+      };
+    }).filter(Boolean);
+
+    if (hasSelectedStartTime || standardSlots.length >= 3) {
+      return standardSlots.slice(0, 3);
+    }
+
+    const filledSlots = [...standardSlots];
+    const nextDate = getDateOffset(selectedDate, 1);
+    const missingPresets = RECOMMENDED_SLOT_PRESETS.slice(standardSlots.length);
+
+    missingPresets.forEach((preset) => {
+      const slotStart = RECOMMENDED_DAY_START_MINUTES;
+      const slotEnd = slotStart + preset.durationMinutes;
+
+      filledSlots.push({
+        key: `${nextDate}-morning-${preset.key}`,
+        date: nextDate,
+        title: preset.title,
+        description: preset.description,
+        start: minutesToTimeValue(slotStart),
+        end: minutesToTimeValue(slotEnd),
+      });
+    });
+
+    return filledSlots.slice(0, 3);
+  })();
+
   const roomsWithAvailability = activeRooms.map((room) => {
     const slotStatus = getSlotStatus(room);
     const isAvailableForSelectedTime = hasCompleteValidSlot
@@ -529,9 +650,9 @@ function RoomsPage() {
   });
 
   return (
-    <section className="min-h-screen px-4 py-6 md:px-6 md:py-8 bg-slate-50">
-      <div className="mb-6 max-w-7xl mx-auto px-2 md:px-4 py-4">
-          <p className="text-xl font-bold text-blue-600 uppercase tracking-wide mb-1">
+    <section className="min-h-screen px-4 py-4 md:px-6 md:py-5 bg-slate-50">
+      <div className="mb-3 max-w-7xl mx-auto px-2 md:px-4 py-2">
+          <p className="text-lg font-bold text-blue-600 uppercase tracking-wide">
             Meeting Rooms
           </p>
         </div>
@@ -546,20 +667,20 @@ function RoomsPage() {
           fetchBookingsByRoomAndDate={fetchBookingsByRoomAndDate}
         />
 
-        <div className="mb-7 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.55fr]">
-            <aside className="bg-slate-950 px-6 py-7 text-white md:px-8 lg:min-h-[520px]">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.78fr_1.62fr]">
+            <aside className="bg-slate-950 px-6 py-6 text-white md:px-7 lg:min-h-[430px]">
 
-              <h1 className="mt-4 max-w-sm text-3xl font-bold md:text-4xl">
+              <h1 className="mt-2 max-w-sm text-3xl font-bold">
                 Find a Room
               </h1>
 
-              <p className="mt-4 max-w-md text-sm leading-6 text-slate-300">
+              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
                 Select a future slot first. RoomBook will show matching rooms with
                 clear availability before you move to the booking page.
               </p>
 
-              <div className="mt-8 space-y-5">
+              <div className="mt-6 space-y-4">
                 <GuideStep
                   number="1"
                   title="Choose the meeting time"
@@ -577,11 +698,11 @@ function RoomsPage() {
                 />
               </div>
 
-              <div className="mt-8 border-t border-white/10 pt-6">
+              <div className="mt-6 border-t border-white/10 pt-5">
                 <p className="text-xs font-semibold uppercase text-slate-400">
                   Selected slot
                 </p>
-                <p className="mt-2 text-lg font-bold text-white">
+                <p className="mt-2 text-base font-bold text-white">
                   {selectedSlotText || "No time selected yet"}
                 </p>
                 <p className="mt-2 text-xs leading-5 text-slate-400">
@@ -590,24 +711,24 @@ function RoomsPage() {
               </div>
             </aside>
 
-            <div className="px-5 py-6 sm:px-7 sm:py-7 xl:px-9 xl:py-8">
-              <div className="mb-7 flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="px-5 py-5 sm:px-6 sm:py-6 xl:px-8 xl:py-6">
+              <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-                    <FaCalendarAlt size={18} />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                    <FaCalendarAlt size={16} />
                   </div>
 
                   <div>
-                    <h2 className="text-xl font-bold leading-tight text-slate-900">
+                    <h2 className="text-lg font-bold leading-tight text-slate-900">
                       Room Availability
                     </h2>
-                    <p className="mt-1 text-sm text-slate-500">
+                    <p className="mt-0.5 text-xs text-slate-500">
                       Complete the required fields, then show matching rooms.
                     </p>
                   </div>
                 </div>
 
-                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-xs font-bold text-slate-700">
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-bold text-slate-700">
                   <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]" />
                   Required fields
                   <span className="font-semibold text-slate-500">
@@ -616,13 +737,13 @@ function RoomsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <DateSelector
                   value={selectedDate}
                   onChange={handleDateChange}
                   label="Date"
                   required
-                  size="large"
+                  size="default"
                 />
 
                 <CompactField
@@ -639,7 +760,7 @@ function RoomsPage() {
                     minTimeMessage={
                       minimumStartTime ? "Past times are disabled for today." : ""
                     }
-                    size="large"
+                    size="default"
                   />
                 </CompactField>
 
@@ -657,9 +778,78 @@ function RoomsPage() {
                     minTimeMessage={
                       minimumEndTime ? "Choose a valid future end time." : ""
                     }
-                    size="large"
+                    size="default"
                   />
                 </CompactField>
+
+                <div className="xl:col-span-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
+  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+    <div>
+      <p className="text-sm font-bold text-slate-950">
+        Recommended slots
+      </p>
+
+      <p className="mt-0.5 text-xs text-slate-500">
+        Choose a common duration.
+      </p>
+    </div>
+
+    <span className="w-fit rounded-full border border-blue-100 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+      Quick select
+    </span>
+  </div>
+
+  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+    {recommendedSlots.map((slot) => {
+      const isSelectedRecommendedSlot =
+        selectedDate === slot.date &&
+        startTime === slot.start &&
+        endTime === slot.end;
+
+      return (
+        <button
+          key={slot.key}
+          type="button"
+          onClick={() => handleRecommendedSlotSelect(slot)}
+          disabled={slot.disabled}
+          className={`rounded-xl border px-3 py-3 text-left transition ${
+            slot.disabled
+              ? "cursor-not-allowed border-slate-100 bg-white/60 text-slate-400"
+              : isSelectedRecommendedSlot
+                ? "border-blue-600 bg-blue-50 shadow-sm"
+                : "border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white hover:shadow-sm"
+          }`}
+        >
+          <span
+            className={`block text-[10px] font-black uppercase tracking-[0.1em] ${
+              slot.disabled
+                ? "text-slate-400"
+                : isSelectedRecommendedSlot
+                  ? "text-blue-700"
+                  : "text-slate-500"
+            }`}
+          >
+            {slot.title}
+          </span>
+
+          <span
+            className={`mt-1 block text-sm font-bold ${
+              slot.disabled ? "text-slate-400" : "text-slate-950"
+            }`}
+          >
+            {slot.disabled
+              ? "Not enough time"
+              : `${formatTime(slot.start)} - ${formatTime(slot.end)}`}
+          </span>
+
+          <span className="mt-1 block text-xs text-slate-500">
+            {formatSlotDateLabel(slot.date)} · {slot.description}
+          </span>
+        </button>
+      );
+    })}
+  </div>
+</div>
 
                 <CompactField
                   icon={<FaBuilding className="text-blue-500" size={14} />}
@@ -668,7 +858,7 @@ function RoomsPage() {
                   <select
                     value={floorFilter}
                     onChange={(event) => handleFloorChange(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-base text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">Any floor</option>
                     {floorOptions.map((floor) => (
@@ -680,7 +870,7 @@ function RoomsPage() {
                 </CompactField>
 
                 <div className="xl:col-span-2">
-                  <label className="mb-2 flex items-center gap-2 text-base font-semibold text-slate-700">
+                  <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <FaUsers className="text-blue-500" size={14} />
                     Capacity
                   </label>
@@ -692,7 +882,7 @@ function RoomsPage() {
                         type="button"
                         onClick={() => handleCapacityChange(option)}
                         disabled={!option.isAvailable}
-                        className={`min-h-14 rounded-xl border px-4 py-3 text-sm font-bold transition-all ${
+                        className={`min-h-11 rounded-xl border px-3 py-2.5 text-sm font-bold transition-all ${
                           capacityKey === option.key
                             ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
                             : !option.isAvailable
@@ -716,7 +906,7 @@ function RoomsPage() {
                     placeholder="Projector, whiteboard, room name..."
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-4 py-3.5 text-base text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                 </CompactField>
               </div>
@@ -730,12 +920,12 @@ function RoomsPage() {
                 </p>
               )}
 
-              <div className="mt-6 flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center">
+              <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   onClick={handleShowRooms}
                   disabled={!canShowAvailableRooms}
-                  className={`min-h-14 flex-1 rounded-xl px-6 py-3 text-base font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                  className={`min-h-12 flex-1 rounded-xl px-6 py-3 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
                     canShowAvailableRooms
                       ? "bg-blue-700 text-white hover:bg-blue-800"
                       : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
@@ -746,7 +936,7 @@ function RoomsPage() {
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="min-h-14 rounded-xl px-6 py-3 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-100"
+                  className="min-h-12 rounded-xl px-6 py-3 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-100"
                 >
                   Clear
                 </button>
@@ -867,7 +1057,7 @@ function RoomsPage() {
 function CompactField({ icon, label, required = false, className = "", children }) {
   return (
     <div className={className}>
-      <label className="mb-2 flex items-center gap-2 text-base font-semibold text-slate-700">
+      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
         {icon}
         {label}
         {required && <span className="text-red-500">•</span>}
