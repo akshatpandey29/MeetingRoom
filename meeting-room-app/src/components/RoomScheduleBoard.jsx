@@ -31,6 +31,7 @@ function RoomScheduleBoard({
   const navigate = useNavigate();
   const [scheduleMode, setScheduleMode] = useState("days");
   const [isRangePickerOpen, setIsRangePickerOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
   const rangePickerRef = useRef(null);
 
   const timeSlots = useMemo(
@@ -46,6 +47,11 @@ function RoomScheduleBoard({
   const visibleDates = useMemo(
     () => getVisibleDates(selectedDate, scheduleMode),
     [scheduleMode, selectedDate]
+  );
+
+  const currentTimeIndicator = useMemo(
+    () => getCurrentTimeIndicator(currentTime, selectedDate),
+    [currentTime, selectedDate]
   );
 
   const dateCards = useMemo(
@@ -97,6 +103,16 @@ function RoomScheduleBoard({
   useEffect(() => {
     setIsRangePickerOpen(false);
   }, [scheduleMode]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, []);
 
   function moveDate(direction) {
     const nextDate = getMovedDate(selectedDate, direction, scheduleMode);
@@ -320,7 +336,7 @@ function RoomScheduleBoard({
             ))}
           </div>
 
-          {rooms.map((room) => {
+          {rooms.map((room, roomIndex) => {
             const roomBookings = scheduleBookings.filter(
               (booking) =>
                 String(booking.roomId) === String(room.id) &&
@@ -346,13 +362,27 @@ function RoomScheduleBoard({
                 </div>
 
                 <div
-                  className="grid min-h-28"
+                  className="relative grid min-h-28"
                   style={{
                     gridColumn: `2 / ${timeSlots.length + 2}`,
                     gridTemplateColumns: `repeat(${timeSlots.length}, var(--schedule-time-column))`,
                     gridTemplateRows: "112px",
                   }}
                 >
+                  {currentTimeIndicator && (
+                    <div
+                      className="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-red-500"
+                      style={{ left: `${currentTimeIndicator.percent}%` }}
+                      aria-hidden="true"
+                    >
+                      {roomIndex === 0 && (
+                        <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                          Now
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {timeSlots.map((slot, index) => {
                     const disabled = isPastSlot(selectedDate, slot);
 
@@ -808,6 +838,29 @@ function convertTimeToMinutes(timeValue) {
 
 function addMinutesToTime(timeValue, minutesToAdd) {
   return minutesToTimeValue(convertTimeToMinutes(timeValue) + minutesToAdd);
+}
+
+function getCurrentTimeIndicator(currentTime, selectedDate) {
+  if (selectedDate !== getTodayDate()) return null;
+
+  const scheduleStartMinutes = convertTimeToMinutes(SCHEDULE_START_TIME);
+  const scheduleEndMinutes = convertTimeToMinutes(SCHEDULE_END_TIME);
+  const currentMinutes =
+    currentTime.getHours() * 60 + currentTime.getMinutes();
+
+  if (
+    currentMinutes < scheduleStartMinutes ||
+    currentMinutes > scheduleEndMinutes
+  ) {
+    return null;
+  }
+
+  return {
+    percent:
+      ((currentMinutes - scheduleStartMinutes) /
+        (scheduleEndMinutes - scheduleStartMinutes)) *
+      100,
+  };
 }
 
 function formatTime(timeValue) {

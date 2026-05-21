@@ -28,10 +28,10 @@ const DEFAULT_ROOM_SLOTS = [
 ];
 
 const CAPACITY_OPTIONS = [
-  { key: "small", label: "1 - 4", minCapacity: 4 },
-  { key: "medium", label: "5 - 10", minCapacity: 10 },
-  { key: "large", label: "11 - 20", minCapacity: 11 },
-  { key: "xlarge", label: "20+", minCapacity: 20 },
+  { key: "small", label: "1 - 4", minCapacity: 1, maxCapacity: 4 },
+  { key: "medium", label: "5 - 10", minCapacity: 5, maxCapacity: 10 },
+  { key: "large", label: "11 - 20", minCapacity: 11, maxCapacity: 19 },
+  { key: "xlarge", label: "20+", minCapacity: 20, maxCapacity: Infinity },
 ];
 
 function RoomsPage() {
@@ -393,15 +393,72 @@ function RoomsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeRoomIds, selectedDate]);
 
-  const floorOptions = useMemo(() => {
-    return Array.from(
-      new Set(activeRooms.map((room) => room.location).filter(Boolean))
-    );
-  }, [activeRooms]);
-
   const selectedCapacity = CAPACITY_OPTIONS.find(
     (option) => option.key === capacityKey
   );
+
+  const floorOptions = useMemo(() => {
+    const roomsForSelectedCapacity = selectedCapacity
+      ? activeRooms.filter((room) =>
+          roomMatchesCapacityOption(room, selectedCapacity)
+        )
+      : activeRooms;
+
+    return Array.from(
+      new Set(roomsForSelectedCapacity.map((room) => room.location).filter(Boolean))
+    );
+  }, [activeRooms, selectedCapacity]);
+
+  const availableCapacityKeys = useMemo(() => {
+    const roomsForSelectedFloor = floorFilter
+      ? activeRooms.filter((room) => room.location === floorFilter)
+      : activeRooms;
+
+    return new Set(
+      roomsForSelectedFloor
+        .map((room) => getCapacityOptionForRoom(room)?.key)
+        .filter(Boolean)
+    );
+  }, [activeRooms, floorFilter]);
+
+  const capacityOptions = CAPACITY_OPTIONS.map((option) => ({
+    ...option,
+    isAvailable: availableCapacityKeys.has(option.key),
+  }));
+
+  function handleFloorChange(nextFloor) {
+    setFloorFilter(nextFloor);
+
+    if (!nextFloor || !selectedCapacity) return;
+
+    const floorHasSelectedCapacity = activeRooms.some(
+      (room) =>
+        room.location === nextFloor &&
+        roomMatchesCapacityOption(room, selectedCapacity)
+    );
+
+    if (!floorHasSelectedCapacity) {
+      setCapacityKey("");
+    }
+  }
+
+  function handleCapacityChange(option) {
+    if (!availableCapacityKeys.has(option.key)) return;
+
+    setCapacityKey((currentKey) => (currentKey === option.key ? "" : option.key));
+
+    if (!floorFilter || capacityKey === option.key) return;
+
+    const floorHasNextCapacity = activeRooms.some(
+      (room) =>
+        room.location === floorFilter &&
+        roomMatchesCapacityOption(room, option)
+    );
+
+    if (!floorHasNextCapacity) {
+      setFloorFilter("");
+    }
+  }
 
   const minimumStartTime = getMinimumStartTimeForDate(selectedDate);
   const minimumEndTime = (() => {
@@ -466,13 +523,19 @@ function RoomsPage() {
     const matchesFloor = !floorFilter || room.location === floorFilter;
 
     const matchesCapacity =
-      !selectedCapacity || room.capacity >= selectedCapacity.minCapacity;
+      !selectedCapacity || roomMatchesCapacityOption(room, selectedCapacity);
 
     return matchesSearch && matchesFloor && matchesCapacity;
   });
 
   return (
     <section className="min-h-screen px-4 py-6 md:px-6 md:py-8 bg-slate-50">
+      <div className="mb-6 max-w-7xl mx-auto px-2 md:px-4 py-4">
+          <p className="text-xl font-bold text-blue-600 uppercase tracking-wide mb-1">
+            Meeting Rooms
+          </p>
+        </div>
+
       <div className="max-w-7xl mx-auto">
         <RoomScheduleBoard
           rooms={activeRooms}
@@ -486,9 +549,6 @@ function RoomsPage() {
         <div className="mb-7 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="grid grid-cols-1 lg:grid-cols-[0.85fr_1.55fr]">
             <aside className="bg-slate-950 px-6 py-7 text-white md:px-8 lg:min-h-[520px]">
-              <p className="text-xs font-bold uppercase text-blue-300">
-                Meeting Rooms
-              </p>
 
               <h1 className="mt-4 max-w-sm text-3xl font-bold md:text-4xl">
                 Find a Room
@@ -547,8 +607,12 @@ function RoomsPage() {
                   </div>
                 </div>
 
-                <div className="rounded-full bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600">
-                  Required fields have a red dot
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-xs font-bold text-slate-700">
+                  <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]" />
+                  Required fields
+                  <span className="font-semibold text-slate-500">
+                    marked in red
+                  </span>
                 </div>
               </div>
 
@@ -603,7 +667,7 @@ function RoomsPage() {
                 >
                   <select
                     value={floorFilter}
-                    onChange={(event) => setFloorFilter(event.target.value)}
+                    onChange={(event) => handleFloorChange(event.target.value)}
                     className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3.5 text-base text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">Any floor</option>
@@ -622,18 +686,17 @@ function RoomsPage() {
                   </label>
 
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    {CAPACITY_OPTIONS.map((option) => (
+                    {capacityOptions.map((option) => (
                       <button
                         key={option.key}
                         type="button"
-                        onClick={() =>
-                          setCapacityKey((currentKey) =>
-                            currentKey === option.key ? "" : option.key
-                          )
-                        }
+                        onClick={() => handleCapacityChange(option)}
+                        disabled={!option.isAvailable}
                         className={`min-h-14 rounded-xl border px-4 py-3 text-sm font-bold transition-all ${
                           capacityKey === option.key
                             ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
+                            : !option.isAvailable
+                              ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
                             : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50"
                         }`}
                       >
@@ -826,6 +889,23 @@ function GuideStep({ number, title, description }) {
       </div>
     </div>
   );
+}
+
+function getCapacityOptionForRoom(room) {
+  const capacity = Number(room?.capacity || 0);
+
+  return CAPACITY_OPTIONS.find(
+    (option) =>
+      capacity >= option.minCapacity && capacity <= option.maxCapacity
+  );
+}
+
+function roomMatchesCapacityOption(room, option) {
+  if (!option) return true;
+
+  const capacity = Number(room?.capacity || 0);
+
+  return capacity >= option.minCapacity && capacity <= option.maxCapacity;
 }
 
 export default RoomsPage;
