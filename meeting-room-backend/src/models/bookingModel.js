@@ -35,6 +35,8 @@ const bookingSchema = new mongoose.Schema(
         BOOKING_STATUS.CONFIRMED,
         BOOKING_STATUS.CANCELLED,
         BOOKING_STATUS.COMPLETED,
+        'checked-in',
+        'no-show',
       ],
       default: BOOKING_STATUS.CONFIRMED,
     },
@@ -59,6 +61,45 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    // ── Check-in fields ───────────────────────────────────────────────────────
+    checkedIn: {
+      type: Boolean,
+      default: false,
+    },
+    checkInTime: {
+      type: Date,
+      default: null,
+    },
+    endedEarly: {
+      type: Boolean,
+      default: false,
+    },
+    endedAt: {
+      type: Date,
+      default: null,
+    },
+    extended: {
+      type: Boolean,
+      default: false,
+    },
+    extendedMinutes: {
+      type: Number,
+      default: 0,
+    },
+    // ── Notifications ─────────────────────────────────────────────────────────
+    notifications: [
+      {
+        type: {
+          type: String,
+          enum: ['booking_confirmed', 'booking_cancelled', 'checkin_reminder',
+                 'request_approved', 'request_rejected', 'meeting_ending_soon',
+                 'booking_extended', 'meeting_ended'],
+        },
+        message: { type: String },
+        read: { type: Boolean, default: false },
+        createdAt: { type: Date, default: Date.now },
+      }
+    ],
   },
   {
     timestamps: true,

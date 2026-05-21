@@ -59,8 +59,9 @@ function normalizeBooking(booking) {
     userId,
     roomName: booking?.roomName || room?.name || "",
     roomLocation: room?.location || "",
-    bookedBy: booking?.bookedBy || user?.name || "Employee",
-    userEmail: booking?.userEmail || user?.email || "",
+    // ── FIX: Don't use logged-in user as fallback — causes "booked by me" bug
+    bookedBy: booking?.bookedBy || "Employee",
+    userEmail: booking?.userEmail || "",
     date: booking?.date || "",
     startTime: booking?.startTime || "",
     endTime: booking?.endTime || "",
@@ -115,15 +116,12 @@ function sortBookingsByDateTime(bookingList) {
 
 function mergeBookings(existingBookings, incomingBookings) {
   const bookingMap = new Map();
-
   existingBookings.forEach((booking) => {
     bookingMap.set(String(booking.id), booking);
   });
-
   incomingBookings.forEach((booking) => {
     bookingMap.set(String(booking.id), booking);
   });
-
   return sortBookingsByDateTime(Array.from(bookingMap.values()));
 }
 
@@ -131,6 +129,7 @@ export function RoomProvider({ children }) {
   const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [myBookings, setMyBookings] = useState([]);
   const [adminRequests, setAdminRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [roomLoading, setRoomLoading] = useState(false);
@@ -177,7 +176,10 @@ export function RoomProvider({ children }) {
       setBookingLoading(true);
       const response = await api.get("/bookings/my");
       const bookingList = response?.data?.data?.bookings || [];
-      setBookings(sortBookingsByDateTime(bookingList.map(normalizeBooking)));
+      const normalized = sortBookingsByDateTime(bookingList.map(normalizeBooking));
+      // ── FIX: Store in both myBookings and bookings
+      setMyBookings(normalized);
+      setBookings(normalized);
       return { success: true, message: response?.data?.message || "My bookings fetched successfully." };
     } catch (error) {
       const message = getErrorMessage(error, "My bookings could not be fetched.");
@@ -218,6 +220,7 @@ export function RoomProvider({ children }) {
     if (!user) {
       setRooms([]);
       setBookings([]);
+      setMyBookings([]);
       setAdminRequests([]);
       setError("");
       return;
@@ -250,7 +253,6 @@ export function RoomProvider({ children }) {
         status: roomData.status || "available",
         isActive: roomData.isActive ?? true,
       };
-
       const response = await api.post("/rooms", payload);
       const createdRoom = normalizeRoom(response?.data?.data?.room);
       setRooms((previousRooms) => [...previousRooms, createdRoom]);
@@ -273,7 +275,6 @@ export function RoomProvider({ children }) {
         status: roomData.status || "available",
         isActive: roomData.isActive ?? true,
       };
-
       const response = await api.put(`/rooms/${roomId}`, payload);
       const updatedRoom = normalizeRoom(response?.data?.data?.room);
       setRooms((previousRooms) =>
@@ -313,21 +314,34 @@ export function RoomProvider({ children }) {
 
   const getRoomById = (roomId) => rooms.find((room) => String(room.id) === String(roomId));
 
-  const getBookingsByRoom = (roomId) => bookings.filter((booking) => String(booking.roomId) === String(roomId));
+  const getBookingsByRoom = (roomId) => bookings.filter((booking) => 
+  String(booking.roomId) === String(roomId) && 
+  booking.status !== 'cancelled' && 
+  booking.status !== 'completed'
+);
 
   const getBookingsByRoomAndDate = (roomId, date) => {
-    return bookings.filter((booking) => String(booking.roomId) === String(roomId) && booking.date === date && booking.status !== "cancelled");
+    return bookings.filter((booking) =>
+      String(booking.roomId) === String(roomId) &&
+      booking.date === date &&
+      booking.status !== "cancelled"
+    );
   };
 
-  const fetchBookingsByRoomAndDate = async (roomId, date) => {
-    try {
-      const response = await api.get("/bookings/room-date", { params: { roomId, date } });
-      const bookingList = response?.data?.data?.bookings || [];
-      const normalizedBookings = bookingList.map(normalizeBooking);
-      setBookings((previousBookings) => mergeBookings(previousBookings, normalizedBookings));
-      return normalizedBookings;
+ const fetchBookingsByRoomAndDate = async (roomId, date) => {
+  try {
+    const response = await api.get("/bookings/room-date", { params: { roomId, date } });
+    const bookingList = response?.data?.data?.bookings || [];
+    const normalizedBookings = bookingList.map(normalizeBooking);
+    setBookings((previousBookings) => mergeBookings(
+      previousBookings,
+      normalizedBookings.filter(b => b.status !== 'completed' && b.status !== 'cancelled')
+    ));
+    return normalizedBookings;
     } catch (error) {
-      return bookings.filter((booking) => String(booking.roomId) === String(roomId) && booking.date === date);
+      return bookings.filter((booking) =>
+        String(booking.roomId) === String(roomId) && booking.date === date
+      );
     }
   };
 
@@ -337,9 +351,12 @@ export function RoomProvider({ children }) {
       return response?.data?.data?.availableSlots || [];
     } catch (error) {
       const bookedSlots = bookings
-        .filter((booking) => String(booking.roomId) === String(roomId) && booking.date === date && booking.status !== "cancelled")
+        .filter((booking) =>
+          String(booking.roomId) === String(roomId) &&
+          booking.date === date &&
+          booking.status !== "cancelled"
+        )
         .map((booking) => booking.slot);
-
       return slots.filter((slot) => !bookedSlots.includes(slot));
     }
   };
@@ -349,6 +366,7 @@ export function RoomProvider({ children }) {
       const response = await api.post("/bookings", { userId, roomId, date, startTime, endTime, purpose });
       const createdBooking = normalizeBooking(response?.data?.data?.booking);
       setBookings((previousBookings) => sortBookingsByDateTime([...previousBookings, createdBooking]));
+      setMyBookings((prev) => sortBookingsByDateTime([...prev, createdBooking]));
       return { success: true, message: response?.data?.message || "Room booked successfully.", data: createdBooking };
     } catch (error) {
       return { success: false, message: getErrorMessage(error, "Room could not be booked.") };
@@ -360,7 +378,14 @@ export function RoomProvider({ children }) {
       const response = await api.delete(`/bookings/${bookingId}`, { data: { reason } });
       const updatedBooking = normalizeBooking(response?.data?.data?.booking);
       setBookings((previousBookings) =>
-        previousBookings.map((booking) => String(booking.id) === String(bookingId) ? updatedBooking : booking)
+        previousBookings.map((booking) =>
+          String(booking.id) === String(bookingId) ? updatedBooking : booking
+        )
+      );
+      setMyBookings((prev) =>
+        prev.map((booking) =>
+          String(booking.id) === String(bookingId) ? updatedBooking : booking
+        )
       );
       return { success: true, message: response?.data?.message || "Booking cancelled successfully.", data: updatedBooking };
     } catch (error) {
@@ -374,6 +399,9 @@ export function RoomProvider({ children }) {
       setBookings((previousBookings) =>
         previousBookings.filter((booking) => String(booking.id) !== String(bookingId))
       );
+      setMyBookings((prev) =>
+        prev.filter((booking) => String(booking.id) !== String(bookingId))
+      );
       return { success: true, message: response?.data?.message || "Booking deleted from database successfully." };
     } catch (error) {
       return { success: false, message: getErrorMessage(error, "Booking could not be deleted from database.") };
@@ -384,8 +412,20 @@ export function RoomProvider({ children }) {
     try {
       const response = await api.patch(`/bookings/${bookingId}/reschedule`, { newDate, newStartTime, newEndTime });
       const updatedBooking = normalizeBooking(response?.data?.data?.booking);
+      // ── FIX: filter + concat instead of map — prevents duplicate showing
       setBookings((previousBookings) =>
-        sortBookingsByDateTime(previousBookings.map((booking) => String(booking.id) === String(bookingId) ? updatedBooking : booking))
+        sortBookingsByDateTime(
+          previousBookings
+            .filter((booking) => String(booking.id) !== String(bookingId))
+            .concat(updatedBooking)
+        )
+      );
+      setMyBookings((prev) =>
+        sortBookingsByDateTime(
+          prev
+            .filter((booking) => String(booking.id) !== String(bookingId))
+            .concat(updatedBooking)
+        )
       );
       return { success: true, message: response?.data?.message || "Booking rescheduled successfully.", data: updatedBooking };
     } catch (error) {
@@ -397,16 +437,17 @@ export function RoomProvider({ children }) {
     try {
       const response = await api.patch(`/admin/booking-requests/${requestId}/approve`, { adminNote });
       const updatedRequest = normalizeAdminRequest(response?.data?.data?.request);
-      const createdBooking = response?.data?.data?.booking ? normalizeBooking(response.data.data.booking) : null;
-
+      const createdBooking = response?.data?.data?.booking
+        ? normalizeBooking(response.data.data.booking)
+        : null;
       setAdminRequests((previousRequests) =>
-        previousRequests.map((request) => String(request.id) === String(requestId) ? updatedRequest : request)
+        previousRequests.map((request) =>
+          String(request.id) === String(requestId) ? updatedRequest : request
+        )
       );
-
       if (createdBooking) {
         setBookings((previousBookings) => sortBookingsByDateTime([...previousBookings, createdBooking]));
       }
-
       return { success: true, message: response?.data?.message || "Booking request approved successfully.", data: { request: updatedRequest, booking: createdBooking } };
     } catch (error) {
       return { success: false, message: getErrorMessage(error, "Booking request could not be approved.") };
@@ -418,7 +459,9 @@ export function RoomProvider({ children }) {
       const response = await api.patch(`/admin/booking-requests/${requestId}/reject`, { adminNote });
       const updatedRequest = normalizeAdminRequest(response?.data?.data?.request);
       setAdminRequests((previousRequests) =>
-        previousRequests.map((request) => String(request.id) === String(requestId) ? updatedRequest : request)
+        previousRequests.map((request) =>
+          String(request.id) === String(requestId) ? updatedRequest : request
+        )
       );
       return { success: true, message: response?.data?.message || "Booking request rejected successfully.", data: updatedRequest };
     } catch (error) {
@@ -428,13 +471,7 @@ export function RoomProvider({ children }) {
 
   const addAdminRequest = async ({ roomId, date, startTime, endTime, purpose = "" }) => {
     try {
-      const response = await api.post("/bookings/requests", {
-        roomId,
-        date,
-        startTime,
-        endTime,
-        purpose,
-      });
+      const response = await api.post("/bookings/requests", { roomId, date, startTime, endTime, purpose });
       const createdRequest = normalizeAdminRequest(response?.data?.data?.request);
       setAdminRequests((previousRequests) => [createdRequest, ...previousRequests]);
       return { success: true, message: response?.data?.message || "Request sent to admin.", data: createdRequest };
@@ -444,14 +481,8 @@ export function RoomProvider({ children }) {
   };
 
   const updateAdminRequest = async (requestId, status, meta = {}) => {
-    if (status === "approved") {
-      return approveAdminRequest(requestId, meta.adminNote || "");
-    }
-
-    if (status === "rejected") {
-      return rejectAdminRequest(requestId, meta.adminNote || "");
-    }
-
+    if (status === "approved") return approveAdminRequest(requestId, meta.adminNote || "");
+    if (status === "rejected") return rejectAdminRequest(requestId, meta.adminNote || "");
     return { success: false, message: "Invalid request status." };
   };
 
@@ -465,6 +496,7 @@ export function RoomProvider({ children }) {
         activeRooms,
         slots,
         bookings,
+        myBookings,
         adminRequests,
         pendingRequests,
         loading,

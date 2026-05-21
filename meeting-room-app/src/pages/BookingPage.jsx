@@ -121,7 +121,9 @@ function BookingPage() {
   }
 
   // ── derived ───────────────────────────────────────────────────────────────
-  const allRoomBookings = getBookingsByRoom(selectedRoom.id);
+  const allRoomBookings = getBookingsByRoom(selectedRoom.id).filter(
+  b => b.status !== 'completed' && b.status !== 'cancelled'
+);
   const bookedSlotsForDate = getBookingsByRoomAndDate(selectedRoom.id, selectedDate);
   const duration = getDuration(startTime, endTime);
   const canBook = selectedDate && startTime && endTime && !editing;
