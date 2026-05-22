@@ -85,6 +85,8 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
 
+          <Route path="/calendar" element={<CalendarPage />} />
+
         </Routes>
       </BrowserRouter>
     </RoomProvider>

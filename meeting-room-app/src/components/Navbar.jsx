@@ -242,9 +242,10 @@ function Navbar() {
     : 'U';
 
   const userNavLinks = [
-    { to: "/rooms", label: "Rooms", icon: <FaDoorOpen size={13} /> },
-    { to: "/mybookings", label: "My Bookings", icon: <FaCalendarCheck size={13} /> },
-  ];
+  { to: "/rooms", label: "Rooms", icon: <FaDoorOpen size={13} /> },
+  { to: "/mybookings", label: "My Bookings", icon: <FaCalendarCheck size={13} /> },
+  { to: "/calendar", label: "Calendar", icon: <FaCalendarAlt size={13} /> },
+];
 
   const adminMobileLinks = [
     { id: "bookings", label: "Bookings", icon: <FaCalendarCheck size={14} /> },
@@ -393,6 +394,19 @@ function Navbar() {
               </Link>
             ))
           )}
+
+          {/* Notification Bell — mobile */}
+{!isAdmin() && (
+  <div className="px-4 py-2.5 flex items-center justify-between">
+    <span className="text-sm font-medium text-slate-600 flex items-center gap-2">
+      <FaBell size={13} className="text-slate-400" /> Notifications
+    </span>
+    <NotificationBell
+      bookings={bookings}
+      userEmail={user?.email}
+    />
+  </div>
+)}
 
           <div className="h-px bg-gray-100 my-2" />
           <button type="button" onClick={handleLogout}

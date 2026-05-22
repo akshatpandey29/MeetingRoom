@@ -5,6 +5,11 @@ const {
   ROOM_STATUS,
   ROLES,
 } = require("../utils/constants");
+const {
+  sendBookingConfirmationEmail,
+  sendBookingCancellationEmail,
+  sendBookingRequestStatusEmail,
+} = require("./emailService");
 
 const convertTimeToMinutes = (time) => {
   const [hours, minutes] = time.split(":").map(Number);
@@ -16,8 +21,24 @@ const hasTimeConflict = (existingStart, existingEnd, newStart, newEnd) => {
   const oldEnd = convertTimeToMinutes(existingEnd);
   const start = convertTimeToMinutes(newStart);
   const end = convertTimeToMinutes(newEnd);
-
   return start < oldEnd && end > oldStart;
+};
+
+// ── Format time helper for emails ─────────────────────────────────────────────
+const formatTimeForEmail = (time) => {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const dh = h % 12 || 12;
+  return `${String(dh).padStart(2,'0')}:${String(m).padStart(2,'0')} ${period}`;
+};
+
+// ── Format date helper for emails ─────────────────────────────────────────────
+const formatDateForEmail = (dateStr) => {
+  if (!dateStr) return '';
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
 };
 
 const createBooking = async ({
@@ -83,12 +104,7 @@ const createBooking = async ({
   });
 
   const conflict = existingBookings.find((booking) =>
-    hasTimeConflict(
-      booking.startTime,
-      booking.endTime,
-      startTime,
-      endTime
-    )
+    hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
   );
 
   if (conflict) {
@@ -114,6 +130,21 @@ const createBooking = async ({
 
   await booking.populate("userId", "name email role");
   await booking.populate("roomId", "name location capacity status isActive");
+
+  // ── Send booking confirmation email ───────────────────────────────────────
+  try {
+    await sendBookingConfirmationEmail({
+      to: user.email,
+      name: user.name,
+      roomName: room.name,
+      date: formatDateForEmail(date),
+      startTime: formatTimeForEmail(startTime),
+      endTime: formatTimeForEmail(endTime),
+    });
+  } catch (emailError) {
+    console.error('Booking confirmation email failed:', emailError.message);
+    // Don't fail the booking if email fails
+  }
 
   return {
     success: true,
@@ -263,6 +294,20 @@ const cancelBooking = async ({
   await booking.populate("userId", "name email role");
   await booking.populate("roomId", "name location capacity status isActive");
 
+  // ── Send booking cancellation email ───────────────────────────────────────
+  try {
+    await sendBookingCancellationEmail({
+      to: booking.userEmail,
+      name: booking.bookedBy,
+      roomName: booking.roomId?.name || booking.roomName || '',
+      date: formatDateForEmail(booking.date),
+      startTime: formatTimeForEmail(booking.startTime),
+      endTime: formatTimeForEmail(booking.endTime),
+    });
+  } catch (emailError) {
+    console.error('Booking cancellation email failed:', emailError.message);
+  }
+
   return {
     success: true,
     message: "Booking cancelled successfully.",
@@ -392,6 +437,20 @@ const rescheduleBooking = async ({
   await booking.populate("userId", "name email role");
   await booking.populate("roomId", "name location capacity status isActive");
 
+  // ── Send reschedule confirmation email ────────────────────────────────────
+  try {
+    await sendBookingConfirmationEmail({
+      to: booking.userEmail,
+      name: booking.bookedBy,
+      roomName: room.name,
+      date: formatDateForEmail(newDate),
+      startTime: formatTimeForEmail(newStartTime),
+      endTime: formatTimeForEmail(newEndTime),
+    });
+  } catch (emailError) {
+    console.error('Reschedule email failed:', emailError.message);
+  }
+
   return {
     success: true,
     message: "Booking rescheduled successfully.",
@@ -411,7 +470,7 @@ const getBookingsByRoomAndDate = async ({ roomId, date }) => {
   const bookings = await Booking.find({
     roomId,
     date,
-    status: BOOKING_STATUS.CONFIRMED,
+    status: { $in: [BOOKING_STATUS.CONFIRMED, 'checked-in'] },
   }).sort({ startTime: 1 });
 
   return {
@@ -454,23 +513,16 @@ const getAvailableSlots = async ({ roomId, date, slots = [] }) => {
   const bookings = await Booking.find({
     roomId,
     date,
-    status: BOOKING_STATUS.CONFIRMED,
+    status: { $in: [BOOKING_STATUS.CONFIRMED, 'checked-in'] },
   });
 
   const bookedSlots = bookings.map((booking) => booking.slot);
 
   const availableSlots = slots.filter((slot) => {
     const [slotStart, slotEnd] = slot.split(" - ");
-
     const hasConflict = bookings.some((booking) =>
-      hasTimeConflict(
-        booking.startTime,
-        booking.endTime,
-        slotStart,
-        slotEnd
-      )
+      hasTimeConflict(booking.startTime, booking.endTime, slotStart, slotEnd)
     );
-
     return !hasConflict;
   });
 
@@ -481,6 +533,82 @@ const getAvailableSlots = async ({ roomId, date, slots = [] }) => {
       availableSlots,
       bookedSlots,
     },
+  };
+};
+
+// ── Approve Admin Request (with email) ────────────────────────────────────────
+const approveAdminRequest = async ({ requestId, adminNote = "" }) => {
+  const request = await AdminRequest.findById(requestId)
+    .populate("userId", "name email")
+    .populate("roomId", "name location");
+
+  if (!request) {
+    return { success: false, statusCode: 404, message: "Request not found." };
+  }
+
+  request.status = ADMIN_REQUEST_STATUS.APPROVED;
+  request.adminNote = adminNote;
+  request.reviewedAt = new Date();
+  await request.save();
+
+  // Send approval email
+  try {
+    await sendBookingRequestStatusEmail({
+      to: request.userEmail,
+      name: request.requestedBy,
+      status: 'approved',
+      roomName: request.roomId?.name || '',
+      date: formatDateForEmail(request.date),
+      startTime: formatTimeForEmail(request.startTime),
+      endTime: formatTimeForEmail(request.endTime),
+      adminNote,
+    });
+  } catch (emailError) {
+    console.error('Approval email failed:', emailError.message);
+  }
+
+  return {
+    success: true,
+    message: "Request approved.",
+    data: { request },
+  };
+};
+
+// ── Reject Admin Request (with email) ─────────────────────────────────────────
+const rejectAdminRequest = async ({ requestId, adminNote = "" }) => {
+  const request = await AdminRequest.findById(requestId)
+    .populate("userId", "name email")
+    .populate("roomId", "name location");
+
+  if (!request) {
+    return { success: false, statusCode: 404, message: "Request not found." };
+  }
+
+  request.status = ADMIN_REQUEST_STATUS.REJECTED;
+  request.adminNote = adminNote;
+  request.reviewedAt = new Date();
+  await request.save();
+
+  // Send rejection email
+  try {
+    await sendBookingRequestStatusEmail({
+      to: request.userEmail,
+      name: request.requestedBy,
+      status: 'rejected',
+      roomName: request.roomId?.name || '',
+      date: formatDateForEmail(request.date),
+      startTime: formatTimeForEmail(request.startTime),
+      endTime: formatTimeForEmail(request.endTime),
+      adminNote,
+    });
+  } catch (emailError) {
+    console.error('Rejection email failed:', emailError.message);
+  }
+
+  return {
+    success: true,
+    message: "Request rejected.",
+    data: { request },
   };
 };
 
@@ -495,4 +623,6 @@ module.exports = {
   getBookingsByRoomAndDate,
   getAvailableSlots,
   hasTimeConflict,
+  approveAdminRequest,
+  rejectAdminRequest,
 };

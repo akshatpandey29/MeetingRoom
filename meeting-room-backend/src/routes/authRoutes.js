@@ -104,4 +104,10 @@ router.post('/google', async (req, res) => {
   }
 });
 
+// ── Update Profile ────────────────────────────────────────────────────────────
+router.put('/profile', authenticate, authController.updateProfile);
+
+// ── Change Password ───────────────────────────────────────────────────────────
+router.put('/change-password', authenticate, authController.changePassword);
+
 module.exports = router;

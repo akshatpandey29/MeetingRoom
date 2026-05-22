@@ -273,6 +273,46 @@ const resetPassword = async (req, res, next) => {
   }
 };
 
+// ── Update Profile ────────────────────────────────────────────────────────────
+const updateProfile = async (req, res, next) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return ApiResponse.error(res, 'Name is required', 400);
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { name: name.trim() },
+      { new: true, runValidators: true }
+    );
+    return ApiResponse.success(res, { user }, 'Profile updated successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── Change Password ───────────────────────────────────────────────────────────
+const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return ApiResponse.error(res, 'Current and new password are required', 400);
+    }
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return ApiResponse.error(res, 'User not found', 404);
+    }
+    const isValid = await user.validatePassword(currentPassword);
+    if (!isValid) {
+      return ApiResponse.error(res, 'Current password is incorrect', 401);
+    }
+    await authService.updatePassword(user._id, newPassword);
+    return ApiResponse.success(res, null, 'Password changed successfully');
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -281,6 +321,8 @@ module.exports = {
   getProfile,
   forgotPassword,
   resetPassword,
+  updateProfile,     
+  changePassword,     
   registerValidation,
   loginValidation,
   forgotPasswordValidation,

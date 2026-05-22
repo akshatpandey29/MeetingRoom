@@ -20,7 +20,9 @@ function CalendarPage() {
   const [message, setMessage] = useState({ text: '', type: '' });
 
   // convert bookings to FullCalendar events
-  const events = bookings.map((booking) => {
+  const events = bookings
+  .filter(b => b.status !== 'cancelled' && b.status !== 'completed')
+  .map((booking) => {
     const isOwner = booking.userEmail === user?.email;
 
     // parse date and times
@@ -55,12 +57,13 @@ function CalendarPage() {
 
   // handle clicking on empty date — go to booking page
   const handleDateClick = (info) => {
-    // find first available room and navigate to booking
-    const firstRoom = rooms.find((r) => r.isActive && r.status === 'available');
-    if (firstRoom) {
-      navigate(`/book/${firstRoom.id}`);
-    }
-  };
+  const firstRoom = rooms.find((r) => r.isActive && r.status === 'available');
+  if (firstRoom) {
+    navigate(`/book/${firstRoom.id}`, {
+      state: { selectedDate: info.dateStr }
+    });
+  }
+};
 
   // cancel booking
   const handleCancel = async () => {
