@@ -247,10 +247,10 @@ function LoginPage() {
                 </div>
                 <form onSubmit={handleLoginSubmit}>
                   <Field icon={<FaEnvelope size={13}/>} label="Email address" error={loginErrors.email} hasError={!!loginErrors.email}>
-                    <input type="email" required placeholder="you@company.com" value={loginData.email} onChange={(e)=>{ setLoginData({...loginData,email:e.target.value}); setLoginErrors({}); }} style={inputStyle}/>
+                    <input type="email" required placeholder="you@company.com" value={loginData.email} onChange={(e)=>{ setLoginData({...loginData,email:e.target.value}); setLoginErrors(prev=>({...prev,email:''})); }} style={inputStyle}/>
                   </Field>
                   <Field icon={<FaLock size={13}/>} label="Password" error={loginErrors.password} hasError={!!loginErrors.password}>
-                    <input type={showPassword?'text':'password'} required placeholder="••••••••" value={loginData.password} onChange={(e)=>{ setLoginData({...loginData,password:e.target.value}); setLoginErrors({}); }} style={inputStyle}/>
+                    <input type={showPassword?'text':'password'} required placeholder="••••••••" value={loginData.password} onChange={(e)=>{ setLoginData({...loginData,password:e.target.value}); setLoginErrors(prev=>({...prev,password:''})); }} style={inputStyle}/>
                     <button type="button" onClick={()=>setShowPassword(!showPassword)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', padding:0, display:'flex' }}>
                       {showPassword?<FaEyeSlash size={14}/>:<FaEye size={14}/>}
                     </button>

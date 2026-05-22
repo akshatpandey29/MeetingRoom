@@ -88,6 +88,7 @@ function NotificationBell({ bookings, userEmail }) {
   const [open, setOpen] = useState(false);
   const [readIds, setReadIds] = useState([]);
   const bellRef = useRef(null);
+  const navigate = useNavigate();
 
   const notifications = getBookingNotifications(bookings, userEmail);
   const unreadCount = notifications.filter(n => !readIds.includes(n.id)).length;
@@ -161,11 +162,15 @@ function NotificationBell({ bookings, userEmail }) {
                 const isRead = readIds.includes(n.id);
                 return (
                   <div
-                    key={n.id}
-                    onClick={() => setReadIds(prev => [...prev, n.id])}
-                    className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-slate-50 transition-colors ${
-                      isRead ? 'opacity-60' : ''
-                    }`}
+                      key={n.id}
+                      onClick={() => {
+                        setReadIds(prev => [...prev, n.id]);
+                        setOpen(false);
+                        navigate(n.bookingId ? '/mybookings' : '/mybookings');
+                      }}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 cursor-pointer hover:bg-slate-50 transition-colors ${
+                        isRead ? 'opacity-60' : ''
+                      }`}
                   >
                     <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${colors.bg} ${colors.text}`}>
                       {iconMap[n.icon] || <FaBell size={13} />}
@@ -244,7 +249,7 @@ function Navbar() {
   const userNavLinks = [
   { to: "/rooms", label: "Rooms", icon: <FaDoorOpen size={13} /> },
   { to: "/mybookings", label: "My Bookings", icon: <FaCalendarCheck size={13} /> },
-  { to: "/calendar", label: "Calendar", icon: <FaCalendarAlt size={13} /> },
+  // { to: "/calendar", label: "Calendar", icon: <FaCalendarAlt size={13} /> },
 ];
 
   const adminMobileLinks = [

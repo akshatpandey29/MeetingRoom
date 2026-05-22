@@ -1,11 +1,6 @@
 import axios from "axios";
 
-const defaultApiHost =
-  typeof window !== "undefined" && window.location.hostname === "127.0.0.1"
-    ? "127.0.0.1"
-    : "localhost";
-const BASE_URL =
-  process.env.REACT_APP_API_URL || `http://${defaultApiHost}:5000/api`;
+const BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -15,7 +10,7 @@ const api = axios.create({
   },
 });
 
-
+// ── Request interceptor — attach JWT token ────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -27,19 +22,27 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// ── Response interceptor — handle 401 ────────────────────────────────────────
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-  const url = error.config?.url || '';
-  const isAuthRequest = url.includes('/auth/logout') || url.includes('/auth/profile');
-  if (error.response && error.response.status === 401 && !isAuthRequest) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    window.location.href = '/';
+    const url = error.config?.url || '';
+    const isAuthRequest =
+      url.includes('/auth/logout') ||
+      url.includes('/auth/profile') ||
+      url.includes('/auth/login');
+
+    // Only redirect to login page on 401 if NOT on an auth route
+    // This prevents login failures from redirecting the page
+    if (error.response?.status === 401 && !isAuthRequest) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+
+    return Promise.reject(error);
   }
-  return Promise.reject(error);
-}
 );
 
 /********** AUTH API CALLS **********/
@@ -120,10 +123,7 @@ export const getAllBookings = async () => {
 };
 
 export const cancelBooking = async (id, reason = "") => {
-  const response = await api.delete(`/bookings/${id}`, {
-    data: { reason },
-  });
-
+  const response = await api.delete(`/bookings/${id}`, { data: { reason } });
   return response.data;
 };
 
@@ -133,18 +133,12 @@ export const rescheduleBooking = async (id, rescheduleData) => {
 };
 
 export const getBookingsByRoomAndDate = async (roomId, date) => {
-  const response = await api.get("/bookings/room-date", {
-    params: { roomId, date },
-  });
-
+  const response = await api.get("/bookings/room-date", { params: { roomId, date } });
   return response.data;
 };
 
 export const getAvailableSlots = async (roomId, date) => {
-  const response = await api.get("/bookings/available-slots", {
-    params: { roomId, date },
-  });
-
+  const response = await api.get("/bookings/available-slots", { params: { roomId, date } });
   return response.data;
 };
 
@@ -181,10 +175,7 @@ export const approveBookingRequest = async (id) => {
 };
 
 export const rejectBookingRequest = async (id, reason = "") => {
-  const response = await api.patch(`/admin/booking-requests/${id}/reject`, {
-    reason,
-  });
-
+  const response = await api.patch(`/admin/booking-requests/${id}/reject`, { reason });
   return response.data;
 };
 
