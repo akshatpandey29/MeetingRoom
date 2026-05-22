@@ -165,12 +165,12 @@ const forgotPassword = async (req, res, next) => {
     // Always return success even if email not found — security best practice
     // so attackers can't enumerate which emails exist
     if (!user) {
-      return ApiResponse.success(
-        res,
-        null,
-        'If this email exists, a reset link has been sent.'
-      );
-    }
+  return ApiResponse.error(
+    res,
+    'No account found with this email address.',
+    404
+  );
+}
 
     // Generate a secure random reset token
     const resetToken = crypto.randomBytes(32).toString('hex');

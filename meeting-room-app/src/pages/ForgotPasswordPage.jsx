@@ -18,14 +18,18 @@ function ForgotPasswordPage() {
     if (!/\S+@\S+\.\S+/.test(email)) { setError('Please enter a valid email address.'); return; }
 
     try {
-      setLoading(true);
-      await api.post('/auth/forgot-password', { email });
-      setSent(true);
-    } catch (err) {
-      setError('Something went wrong. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  setLoading(true);
+  const response = await api.post('/auth/forgot-password', { email });
+  if (response.data?.success) {
+    setSent(true);
+  } else {
+    setError(response.data?.message || 'Something went wrong. Please try again.');
+  }
+} catch (err) {
+  setError(err.response?.data?.message || 'No account found with this email address.');
+} finally {
+  setLoading(false);
+}
   };
 
   return (
