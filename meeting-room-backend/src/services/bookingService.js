@@ -24,6 +24,8 @@ const hasTimeConflict = (existingStart, existingEnd, newStart, newEnd) => {
   return start < oldEnd && end > oldStart;
 };
 
+const ACTIVE_BOOKING_STATUSES = [BOOKING_STATUS.CONFIRMED, "checked-in"];
+
 // ── Format time helper for emails ─────────────────────────────────────────────
 const formatTimeForEmail = (time) => {
   if (!time) return '';
@@ -100,7 +102,7 @@ const createBooking = async ({
   const existingBookings = await Booking.find({
     roomId,
     date,
-    status: BOOKING_STATUS.CONFIRMED,
+    status: { $in: ACTIVE_BOOKING_STATUSES },
   });
 
   const conflict = existingBookings.find((booking) =>
@@ -112,6 +114,27 @@ const createBooking = async ({
       success: false,
       statusCode: 409,
       message: "This time conflicts with an existing booking.",
+    };
+  }
+
+  const existingUserBookings = await Booking.find({
+    userId: bookingUserId,
+    date,
+    status: { $in: ACTIVE_BOOKING_STATUSES },
+  });
+
+  const userConflict = existingUserBookings.find((booking) =>
+    hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
+  );
+
+  if (userConflict) {
+    return {
+      success: false,
+      statusCode: 409,
+      message:
+        currentUser?.role === ROLES.ADMIN
+          ? "This user already has another room booked at this time."
+          : "You already have another room booked at this time.",
     };
   }
 
@@ -406,7 +429,7 @@ const rescheduleBooking = async ({
   const existingBookings = await Booking.find({
     roomId: booking.roomId,
     date: newDate,
-    status: BOOKING_STATUS.CONFIRMED,
+    status: { $in: ACTIVE_BOOKING_STATUSES },
     _id: { $ne: bookingId },
   });
 
@@ -424,6 +447,32 @@ const rescheduleBooking = async ({
       success: false,
       statusCode: 409,
       message: "This time conflicts with an existing booking.",
+    };
+  }
+
+  const existingUserBookings = await Booking.find({
+    userId: booking.userId,
+    date: newDate,
+    status: { $in: ACTIVE_BOOKING_STATUSES },
+    _id: { $ne: bookingId },
+  });
+
+  const userConflict = existingUserBookings.find((existingBooking) =>
+    hasTimeConflict(
+      existingBooking.startTime,
+      existingBooking.endTime,
+      newStartTime,
+      newEndTime
+    )
+  );
+
+  if (userConflict) {
+    return {
+      success: false,
+      statusCode: 409,
+      message: isAdmin
+        ? "This user already has another room booked at this time."
+        : "You already have another room booked at this time.",
     };
   }
 
