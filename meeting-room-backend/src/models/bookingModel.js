@@ -86,6 +86,11 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    reminderSent: {
+  type: Boolean,
+  default: false,
+},
     // ── Notifications ─────────────────────────────────────────────────────────
     notifications: [
       {

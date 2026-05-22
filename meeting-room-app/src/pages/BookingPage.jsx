@@ -81,6 +81,7 @@ function BookingPage() {
   const [message, setMessage] = useState({ text: "", type: "" });
   const [loading, setLoading] = useState(false);
   const [adminRequestSent, setAdminRequestSent] = useState(false);
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [conflictDetails, setConflictDetails] = useState(null);
 
@@ -193,9 +194,11 @@ function BookingPage() {
     });
     setLoading(false);
     if (result.success) {
-      setMessage({ text: "Room booked successfully! 🎉", type: "success" });
-      setPurpose("");
-    } else {
+  setMessage({ text: "Room booked successfully! 🎉", type: "success" });
+  setPurpose("");
+  setBookingConfirmed(true);
+}
+     else {
       setMessage({ text: result.message, type: "error" });
     }
   }
@@ -399,39 +402,33 @@ function BookingPage() {
             </div>
 
             {/* Bookings on selected date */}
-            <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wide mb-3">
-                Bookings on {formatDateLabel(selectedDate)}
-              </h3>
-              {bookedSlotsForDate.length > 0 ? (
-                <div className="space-y-2">
-                  {bookedSlotsForDate.map((booking) => (
-                    <div key={booking.id} className={`flex items-center justify-between rounded-xl px-3 py-2.5 ${
-                      booking.userEmail === user?.email ? "bg-blue-50 border border-blue-100" : "bg-slate-50 border border-slate-100"
-                    }`}>
-                      <div>
-                        <p className={`text-xs font-semibold ${booking.userEmail === user?.email ? "text-blue-700" : "text-slate-700"}`}>
-                          {booking.slot}
-                        </p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          {booking.userEmail === user?.email ? "Your booking" : `By: ${booking.bookedBy}`}
-                        </p>
-                      </div>
-                      {booking.userEmail === user?.email && (
-                        <button onClick={() => { setCancelBookingId(booking.id); setShowCancelModal(true); }}
-                          className="text-xs font-medium text-red-500 hover:text-red-700 flex items-center gap-1">
-                          <FaTimesCircle size={11} /> Cancel
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 rounded-xl px-3 py-2.5">
-                  <FaCheckCircle size={12} /> All slots available for this date
-                </div>
-              )}
-            </div>
+            {/* Availability Timeline */}
+{/* Booking Guidelines */}
+<div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-4">
+  <h3 className="text-xl font-bold text-slate-700 uppercase tracking-wide mb-4">
+    Booking Guidelines
+  </h3>
+  <div className="space-y-3">
+    {[
+      // { icon: '⏰', title: 'Check-in required', desc: 'Check in within 5 minutes of your meeting start time.' },
+      { icon: '🔔', title: 'Auto-release', desc: 'Room is freed automatically after 15 min with no check-in.' },
+      // { icon: '➕', title: 'Extend anytime', desc: 'Extend your meeting in 15 minute increments if needed.' },
+      { icon: '❌', title: 'Free cancellation', desc: 'Cancel anytime before your meeting starts.' },
+      // { icon: '📧', title: 'Email confirmation', desc: 'A confirmation email is sent after every booking.' },
+      { icon: '🛡️', title: 'Admin approval', desc: 'Conflicted slots can be sent for admin approval.' },
+    ].map(({ icon, title, desc }) => (
+      <div key={title} className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-0">
+        <div className="w-8 h-8 bg-slate-50 rounded-xl flex items-center justify-center flex-shrink-0 text-base">
+          {icon}
+        </div>
+        <div>
+          <p className="text-xs font-bold text-slate-700">{title}</p>
+          <p className="text-[12px] text-slate-700 mt-0.5 leading-relaxed">{desc}</p>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
           </div>
 
           {/* ── RIGHT — Booking Summary + Form ── */}
@@ -472,35 +469,70 @@ function BookingPage() {
                 <div className="space-y-4">
                   <p className="text-xs text-slate-400">Update your date and time selection:</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 block mb-1">Date</label>
-                      <input
-                        type="date"
-                        value={selectedDate}
-                        min={getTodayStr()}
-                        onChange={e => { setSelectedDate(e.target.value); setMessage({text:'',type:''}); setConflict(false); }}
-                        className="w-full bg-white bg-opacity-10 text-white border border-white border-opacity-20 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 block mb-1">Start Time</label>
-                      <input
-                        type="time"
-                        value={startTime}
-                        onChange={e => { setStartTime(e.target.value); setEndTime(''); setMessage({text:'',type:''}); setConflict(false); }}
-                        className="w-full bg-white bg-opacity-10 text-white border border-white border-opacity-20 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 block mb-1">End Time</label>
-                      <input
-                        type="time"
-                        value={endTime}
-                        onChange={e => { setEndTime(e.target.value); setMessage({text:'',type:''}); setConflict(false); }}
-                        className="w-full bg-white bg-opacity-10 text-white border border-white border-opacity-20 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400"
-                      />
-                    </div>
-                  </div>
+  {/* Date */}
+  <div>
+    <label className="text-xs font-semibold text-slate-400 block mb-1">
+      📅 Date
+    </label>
+    <input
+      type="date"
+      value={selectedDate}
+      min={getTodayStr()}
+      onChange={e => { setSelectedDate(e.target.value); setMessage({text:'',type:''}); setConflict(false); }}
+      onClick={e => e.target.showPicker?.()}
+      className="w-full bg-white text-slate-900 border-2 border-blue-400 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 cursor-pointer font-medium"
+    />
+  </div>
+
+  {/* Start Time */}
+  <div>
+    <label className="text-xs font-semibold text-slate-400 block mb-1">
+      🕐 Start Time
+    </label>
+    <select
+      value={startTime}
+      onChange={e => { setStartTime(e.target.value); setEndTime(''); setMessage({text:'',type:''}); setConflict(false); }}
+      className="w-full bg-white text-slate-900 border-2 border-blue-400 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 cursor-pointer font-medium"
+    >
+      <option value="">Select start time</option>
+      {Array.from({ length: 96 }, (_, i) => {
+  const h = Math.floor(i / 4);
+  const m = String((i % 4) * 15).padStart(2, '0');
+        const value = `${String(h).padStart(2,'0')}:${m}`;
+        const period = h >= 12 ? 'PM' : 'AM';
+        const dh = h % 12 || 12;
+        const label = `${String(dh).padStart(2,'0')}:${m} ${period}`;
+        return <option key={value} value={value}>{label}</option>;
+      })}
+    </select>
+  </div>
+
+  {/* End Time */}
+  <div>
+    <label className="text-xs font-semibold text-slate-400 block mb-1">
+      🕐 End Time
+    </label>
+    <select
+      value={endTime}
+      disabled={!startTime}
+      onChange={e => { setEndTime(e.target.value); setMessage({text:'',type:''}); setConflict(false); }}
+      className="w-full bg-white text-slate-900 border-2 border-blue-400 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-500 cursor-pointer font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <option value="">Select end time</option>
+      {startTime && Array.from({ length: 48 }, (_, i) => {
+        const h = Math.floor(i / 2);
+        const m = i % 2 === 0 ? '00' : '30';
+        const value = `${String(h).padStart(2,'0')}:${m}`;
+        const period = h >= 12 ? 'PM' : 'AM';
+        const dh = h % 12 || 12;
+        const label = `${String(dh).padStart(2,'0')}:${m} ${period}`;
+        // Only show times after start time
+        if (value <= startTime) return null;
+        return <option key={value} value={value}>{label}</option>;
+      })}
+    </select>
+  </div>
+</div>
                   {duration && (
                     <div className="inline-flex items-center gap-2 bg-white bg-opacity-10 px-3 py-1.5 rounded-lg">
                       <FaClock size={11} className="text-blue-400" />
@@ -565,23 +597,25 @@ function BookingPage() {
             {/* Action buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={handleBook}
-                disabled={!canBook || loading}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
-                  canBook && !loading
-                    ? "bg-slate-900 text-white hover:bg-slate-700 shadow-sm"
-                    : "bg-gray-100 text-gray-400 cursor-not-allowed"
-                }`}
-              >
-                {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-opacity-30 border-t-white rounded-full animate-spin" />
-                    Booking...
-                  </>
-                ) : (
-                  <><FaCalendarAlt size={13} /> Confirm Booking</>
-                )}
-              </button>
+  onClick={handleBook}
+  disabled={!canBook || loading || bookingConfirmed}
+  className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold transition-all ${
+    canBook && !loading && !bookingConfirmed
+      ? "bg-slate-900 text-white hover:bg-slate-700 shadow-sm"
+      : "bg-gray-100 text-gray-400 cursor-not-allowed"
+  }`}
+>
+  {loading ? (
+    <>
+      <div className="w-4 h-4 border-2 border-white border-opacity-30 border-t-white rounded-full animate-spin" />
+      Booking...
+    </>
+  ) : bookingConfirmed ? (
+    <><FaCheckCircle size={13} /> Booking Confirmed ✓</>
+  ) : (
+    <><FaCalendarAlt size={13} /> Confirm Booking</>
+  )}
+</button>
 
               <button
                 onClick={handleAdminRequest}

@@ -23,6 +23,14 @@ function formatDisplayDate(dateStr) {
   });
 }
 
+function formatTime(time) {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const dh = h % 12 || 12;
+  return `${String(dh).padStart(2,'0')}:${String(m).padStart(2,'0')} ${period}`;
+}
+
 function isUpcoming(booking) {
   const today = getTodayDate();
   if (booking.status === 'cancelled' || booking.status === 'completed') return false;
@@ -51,12 +59,72 @@ function getBookingState(booking) {
     const [sh, sm] = booking.startTime.split(':').map(Number);
     const startDT = new Date(`${today}T${String(sh).padStart(2,'0')}:${String(sm).padStart(2,'0')}:00`);
     const diffMins = (startDT - now) / 60000;
-
     if (diffMins <= 5 && diffMins > -60) return 'can-checkin';
     if (diffMins > 15) return 'upcoming';
   }
 
   return 'upcoming';
+}
+
+// ── End Meeting Modal ─────────────────────────────────────────────────────────
+function EndMeetingModal({ isOpen, booking, onConfirm, onCancel }) {
+  if (!isOpen || !booking) return null;
+
+  const now = new Date();
+  const currentTime = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 z-10">
+
+        {/* Icon */}
+        <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <FaStopCircle size={24} className="text-red-500" />
+        </div>
+
+        {/* Title */}
+        <h3 className="text-lg font-bold text-slate-900 text-center mb-1">
+          End Meeting Early?
+        </h3>
+        <p className="text-xs text-slate-400 text-center mb-5">
+          This will free up the room for others
+        </p>
+
+        {/* Booking details */}
+        <div className="bg-slate-50 rounded-xl p-4 mb-5 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400 font-medium">Room</span>
+            <span className="font-semibold text-slate-800">{booking.roomName}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400 font-medium">Scheduled until</span>
+            <span className="font-semibold text-slate-800">{formatTime(booking.endTime)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400 font-medium">Ending now at</span>
+            <span className="font-semibold text-red-600">{formatTime(currentTime)}</span>
+          </div>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 py-2.5 text-sm font-semibold bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition-colors"
+          >
+            Keep Going
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 py-2.5 text-sm font-semibold bg-red-500 text-white rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-1.5"
+          >
+            <FaStopCircle size={12} /> Yes, End Meeting
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── stat card ─────────────────────────────────────────────────────────────────
@@ -80,11 +148,11 @@ function BookingCard({ booking, onCancel, onReschedule, onCheckin, onEnd, onExte
   const isToday = booking.date === getTodayDate();
 
   const stateConfig = {
-    'upcoming':    { label: 'Upcoming',        bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500' },
-    'can-checkin': { label: 'Check in now',     bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500' },
-    'active':      { label: 'In use',           bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-    'completed':   { label: 'Completed',        bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400' },
-    'cancelled':   { label: 'Cancelled',        bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-400' },
+    'upcoming':    { label: 'Upcoming',     bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500' },
+    'can-checkin': { label: 'Check in now', bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500' },
+    'active':      { label: 'In use',       bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    'completed':   { label: 'Completed',    bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400' },
+    'cancelled':   { label: 'Cancelled',    bg: 'bg-red-50',     text: 'text-red-600',     dot: 'bg-red-400' },
   };
 
   const cfg = stateConfig[state] || stateConfig['upcoming'];
@@ -120,13 +188,9 @@ function BookingCard({ booking, onCancel, onReschedule, onCheckin, onEnd, onExte
         </td>
         <td className="px-3 py-4">
           <ActionButtons
-            state={state}
-            booking={booking}
-            onCancel={onCancel}
-            onReschedule={onReschedule}
-            onCheckin={onCheckin}
-            onEnd={onEnd}
-            onExtend={onExtend}
+            state={state} booking={booking}
+            onCancel={onCancel} onReschedule={onReschedule}
+            onCheckin={onCheckin} onEnd={onEnd} onExtend={onExtend}
             compact
           />
         </td>
@@ -134,7 +198,6 @@ function BookingCard({ booking, onCancel, onReschedule, onCheckin, onEnd, onExte
     );
   }
 
-  // Grid card
   return (
     <div className={`border rounded-2xl p-4 hover:shadow-md transition-all ${
       state === 'active' ? 'border-emerald-200 bg-emerald-50/30' :
@@ -153,7 +216,6 @@ function BookingCard({ booking, onCancel, onReschedule, onCheckin, onEnd, onExte
           {cfg.label}
         </span>
       </div>
-
       <div className="space-y-1.5 mb-4">
         <div className="flex items-center gap-2 text-xs text-slate-500">
           <FaCalendarAlt size={10} className="text-blue-400 flex-shrink-0" />
@@ -167,15 +229,10 @@ function BookingCard({ booking, onCancel, onReschedule, onCheckin, onEnd, onExte
           <div className="text-xs text-slate-400 italic">"{booking.purpose}"</div>
         )}
       </div>
-
       <ActionButtons
-        state={state}
-        booking={booking}
-        onCancel={onCancel}
-        onReschedule={onReschedule}
-        onCheckin={onCheckin}
-        onEnd={onEnd}
-        onExtend={onExtend}
+        state={state} booking={booking}
+        onCancel={onCancel} onReschedule={onReschedule}
+        onCheckin={onCheckin} onEnd={onEnd} onExtend={onExtend}
       />
     </div>
   );
@@ -190,7 +247,7 @@ function ActionButtons({ state, booking, onCancel, onReschedule, onCheckin, onEn
   if (state === 'active') {
     return (
       <div className={compact ? "flex items-center gap-2" : "flex gap-2"}>
-        <button onClick={() => onEnd(booking.id)}
+        <button onClick={() => onEnd(booking)}
           className={`${btnBase} bg-red-500 text-white hover:bg-red-600`}>
           <FaStopCircle size={11} /> End Meeting
         </button>
@@ -237,19 +294,27 @@ function ActionButtons({ state, booking, onCancel, onReschedule, onCheckin, onEn
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 function MyBookingsPage() {
-const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
+  const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
   const { user } = useAuth();
 
   const [message, setMessage] = useState({ text: '', type: '' });
   const [viewMode, setViewMode] = useState('list');
   const [searchText, setSearchText] = useState('');
+
+  // Cancel modal
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
+
+  // End meeting modal
+  const [endModalOpen, setEndModalOpen] = useState(false);
+  const [endBooking, setEndBooking] = useState(null);
+
+  // Reschedule modal
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingModalDate, setBookingModalDate] = useState(null);
   const [bookingModalPrefilled, setBookingModalPrefilled] = useState(null);
 
-  // Auto-refresh every 30 seconds for live status
+  // Auto-refresh every 30 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchMyBookings();
@@ -257,9 +322,10 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
     return () => clearInterval(interval);
   }, [fetchMyBookings]);
 
-  const myAllBookings = myBookings.length > 0 
-  ? myBookings 
-  : bookings.filter(b => b.userEmail === user?.email);
+  const myAllBookings = myBookings.length > 0
+    ? myBookings
+    : bookings.filter(b => b.userEmail === user?.email);
+
   const upcomingBookings = myAllBookings
     .filter(b => isUpcoming(b))
     .sort((a, b) => {
@@ -280,7 +346,7 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
   const weekEndStr = weekEnd.toISOString().split('T')[0];
   const thisWeekCount = upcomingBookings.filter(b => b.date >= getTodayDate() && b.date <= weekEndStr).length;
 
-  // ── handlers ─────────────────────────────────────────────────────────────
+  // ── handlers ──────────────────────────────────────────────────────────────
   const showMessage = (text, type) => {
     setMessage({ text, type });
     setTimeout(() => setMessage({ text: '', type: '' }), 4000);
@@ -318,20 +384,27 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
     }
   };
 
-  const handleEnd = async (bookingId) => {
-  try {
-    const response = await api.post(`/bookings/${bookingId}/end`);
-    if (response.data?.success) {
-      showMessage('Meeting ended. Room is now free for others!', 'success');
-      await fetchMyBookings();
-      // Force page reload to clear calendar state
-      setTimeout(() => window.location.reload(), 1500);
-    }
-      else {
+  // ── End meeting — opens popup first ──────────────────────────────────────
+  const handleEnd = (booking) => {
+    setEndBooking(booking);
+    setEndModalOpen(true);
+  };
+
+  const handleConfirmEnd = async () => {
+    setEndModalOpen(false);
+    try {
+      const response = await api.post(`/bookings/${endBooking.id}/end`);
+      if (response.data?.success) {
+        showMessage('Meeting ended. Room is now free for others!', 'success');
+        await fetchMyBookings();
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
         showMessage(response.data?.message || 'Failed to end meeting.', 'error');
       }
     } catch (error) {
       showMessage(error.response?.data?.message || 'Failed to end meeting.', 'error');
+    } finally {
+      setEndBooking(null);
     }
   };
 
@@ -353,6 +426,7 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
     <section className="min-h-screen bg-slate-50">
       <div className="max-w-5xl mx-auto px-4 md:px-6 py-6">
 
+        {/* Cancel Booking Modal */}
         <ConfirmModal
           isOpen={modalOpen}
           title="Cancel Booking"
@@ -363,6 +437,15 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
           onCancel={() => { setModalOpen(false); setSelectedBookingId(null); }}
         />
 
+        {/* End Meeting Modal */}
+        <EndMeetingModal
+          isOpen={endModalOpen}
+          booking={endBooking}
+          onConfirm={handleConfirmEnd}
+          onCancel={() => { setEndModalOpen(false); setEndBooking(null); }}
+        />
+
+        {/* Reschedule Modal */}
         <BookingModal
           isOpen={bookingModalOpen}
           onClose={() => { setBookingModalOpen(false); setBookingModalPrefilled(null); }}
@@ -398,7 +481,7 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
           <StatCard icon={<FaCalendarAlt />} label="This Week" value={thisWeekCount} colorClass="text-violet-600" bgClass="bg-violet-50" />
         </div>
 
-        {/* Check-in guide banner — show when there are bookings that can be checked in */}
+        {/* Check-in banner */}
         {upcomingBookings.some(b => getBookingState(b) === 'can-checkin') && (
           <div className="mb-4 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-center gap-3">
             <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -426,8 +509,6 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
 
         {/* Bookings Panel */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-
-          {/* Panel header */}
           <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h2 className="text-sm font-bold text-slate-900">Your Upcoming Bookings</h2>
@@ -461,7 +542,6 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
             </div>
           </div>
 
-          {/* Content */}
           {filteredBookings.length > 0 ? (
             <>
               {viewMode === 'list' && (
@@ -470,7 +550,7 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
                     <thead>
                       <tr className="bg-slate-50 border-b border-gray-100">
                         {['Date', 'Time', 'Room', 'Status', 'Actions'].map(h => (
-                          <th key={h} className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide px-5 py-3 first:px-5 px-3">{h}</th>
+                          <th key={h} className="text-left text-[11px] font-bold text-slate-400 uppercase tracking-wide px-5 py-3">{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -539,7 +619,7 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
         <div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-400 px-1">
           {[
             { dot: 'bg-blue-500', label: 'Upcoming' },
-            { dot: 'bg-amber-500 animate-pulse', label: 'Check in now (within 15 min)' },
+            { dot: 'bg-amber-500 animate-pulse', label: 'Check in now (within 5 min)' },
             { dot: 'bg-emerald-500 animate-pulse', label: 'Active / In use' },
           ].map(({ dot, label }) => (
             <div key={label} className="flex items-center gap-1.5">

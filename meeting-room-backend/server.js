@@ -4,10 +4,16 @@ const env = require("./src/config/env");
 const { connectDB } = require("./src/config/database");
 const app = require("./src/app");
 const logger = require("./src/utils/logger");
+const { startAutoReleaseJob } = require('./src/jobs/autoRelease');
+const { startReminderJob } = require('./src/jobs/ReminderEmails');
 
 const startServer = async () => {
   try {
     await connectDB();
+
+    // ── Start background jobs ─────────────────────────────────────────────────
+    startAutoReleaseJob();
+    startReminderJob();
 
     const server = app.listen(env.port, () => {
       logger.info(`Server running on port ${env.port} in ${env.nodeEnv} mode`);

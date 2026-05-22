@@ -4,9 +4,7 @@ import api from "../services/api";
 
 const AuthContext = createContext();
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -16,61 +14,52 @@ export const AuthProvider = ({ children }) => {
 
   const normalizeUser = useCallback((currentUser) => {
     if (!currentUser) return null;
-
     return {
       ...currentUser,
       id: currentUser.id || currentUser._id,
-      status:
-        currentUser.status ||
-        (currentUser.isActive === false ? "disabled" : "active"),
+      status: currentUser.status || (currentUser.isActive === false ? "disabled" : "active"),
     };
   }, []);
 
-  // ── On app load — restore session from auth cookie ─────────────────────────
+  // ── Restore session on app load ───────────────────────────────────────────
   useEffect(() => {
     let isMounted = true;
 
     const restoreSession = async () => {
-  try {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+      try {
+        const savedToken = localStorage.getItem('token');
+        if (!savedToken) {
+          setLoading(false);
+          return;
+        }
 
-    if (!savedToken || !savedUser) {
-      setLoading(false);
-      return;
-    }
+        // Verify token with backend
+        const response = await api.get("/auth/profile");
+        const profileUser = normalizeUser(response.data?.data?.user);
 
-    // Verify token is still valid
-    const response = await api.get("/auth/profile");
-    const profileUser = normalizeUser(response.data?.data?.user);
-
-    if (isMounted && profileUser) {
-      setUser(profileUser);
-      setToken(savedToken);
-    }
-  } catch {
-    if (isMounted) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      setUser(null);
-      setToken(null);
-    }
-  } finally {
-    if (isMounted) {
-      setLoading(false);
-    }
-  }
-};
+        if (isMounted && profileUser) {
+          setUser(profileUser);
+          setToken(savedToken);
+        }
+      } catch {
+        // Token expired or invalid — clear everything
+        if (isMounted) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
+          setUser(null);
+          setToken(null);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
     restoreSession();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [normalizeUser]);
 
-  // ── Fetch all users (admin use) ─────────────────────────────────────────────
+  // ── Fetch all users (admin) ───────────────────────────────────────────────
   const fetchAllUsers = useCallback(async () => {
     try {
       const response = await api.get("/admin/users");
@@ -89,7 +78,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, [fetchAllUsers, token, user?.role]);
 
-  // ── LOGIN ───────────────────────────────────────────────────────────────────
+  // ── LOGIN ─────────────────────────────────────────────────────────────────
   const login = async (loginData) => {
     try {
       if (!loginData.email || !loginData.password) {
@@ -100,8 +89,15 @@ export const AuthProvider = ({ children }) => {
 
       if (response.success && response.data) {
         const loggedInUser = normalizeUser(response.data.user);
+        const accessToken = response.data.accessToken;
+        const refreshToken = response.data.refreshToken;
 
-        setToken("cookie-session");
+        // Save tokens to localStorage
+        if (accessToken) localStorage.setItem('token', accessToken);
+        if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+        localStorage.setItem('user', JSON.stringify(loggedInUser));
+
+        setToken(accessToken);
         setUser(loggedInUser);
 
         return { success: true, user: loggedInUser };
@@ -118,7 +114,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── REGISTER ────────────────────────────────────────────────────────────────
+  // ── REGISTER ──────────────────────────────────────────────────────────────
   const register = async (registerData) => {
     try {
       const response = await registerUser({
@@ -143,36 +139,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── LOGOUT ──────────────────────────────────────────────────────────────────
+  // ── LOGOUT ────────────────────────────────────────────────────────────────
   const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // ignore
+    } finally {
+      logoutUser();
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      setUser(null);
+      setToken(null);
+      setUsers([]);
+    }
+  };
 
-  try {
-    await api.post('/auth/logout');
-  } catch {
-    // ignore error
-  } finally {
-    logoutUser();
-
-    
-    setUser(null);
-    setToken(null);
-    setUsers([]);
-  }
-};
-
-  // ── UPDATE PROFILE ──────────────────────────────────────────────────────────
+  // ── UPDATE PROFILE ────────────────────────────────────────────────────────
   const updateProfile = async ({ name }) => {
     try {
       const response = await api.put("/auth/profile", { name });
-
       if (response.data?.success) {
         const updatedUser = { ...user, name };
         setUser(updatedUser);
+        localStorage.setItem('user', JSON.stringify(updatedUser));
         return { success: true };
       }
-
       return { success: false, message: response.data?.message || "Update failed." };
-
     } catch {
       const updatedUser = { ...user, name };
       setUser(updatedUser);
@@ -180,86 +174,56 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ── CHANGE PASSWORD ─────────────────────────────────────────────────────────
+  // ── CHANGE PASSWORD ───────────────────────────────────────────────────────
   const changePassword = async ({ currentPassword, newPassword }) => {
     try {
-      const response = await api.put("/auth/change-password", {
-        currentPassword,
-        newPassword,
-      });
-
-      if (response.data?.success) {
-        return { success: true };
-      }
-
+      const response = await api.put("/auth/change-password", { currentPassword, newPassword });
+      if (response.data?.success) return { success: true };
       return { success: false, message: response.data?.message || "Password change failed." };
-
     } catch (error) {
-      const message = error.response?.data?.message || "Password change failed. Please try again.";
+      const message = error.response?.data?.message || "Password change failed.";
       return { success: false, message };
     }
   };
 
-  // ── ADMIN — Change user role ────────────────────────────────────────────────
+  // ── ADMIN — Change user role ───────────────────────────────────────────────
   const changeUserRole = async (userId) => {
     try {
       const response = await api.patch(`/admin/users/${userId}/role`);
-
       if (response.data?.success) {
         await fetchAllUsers();
         return { success: true, message: "User role updated successfully." };
       }
-
       return { success: false, message: response.data?.message || "Role update failed." };
-
     } catch (error) {
-      const message = error.response?.data?.message || "Role update failed.";
-      return { success: false, message };
+      return { success: false, message: error.response?.data?.message || "Role update failed." };
     }
   };
 
-  // ── ADMIN — Toggle user status ──────────────────────────────────────────────
+  // ── ADMIN — Toggle user status ─────────────────────────────────────────────
   const toggleUserStatus = async (userId) => {
     try {
       const response = await api.patch(`/admin/users/${userId}/status`);
-
       if (response.data?.success) {
         await fetchAllUsers();
         return { success: true, message: "User status updated successfully." };
       }
-
       return { success: false, message: response.data?.message || "Status update failed." };
-
     } catch (error) {
-      const message = error.response?.data?.message || "Status update failed.";
-      return { success: false, message };
+      return { success: false, message: error.response?.data?.message || "Status update failed." };
     }
   };
 
-  // ── helpers ─────────────────────────────────────────────────────────────────
   const isAdmin = () => user?.role === "admin";
   const isLoggedIn = () => user !== null;
-
   const admins = users.filter((u) => u.role === "admin");
   const normalUsers = users.filter((u) => u.role === "user");
 
   const value = {
-    user,
-    token,
-    users,
-    admins,
-    normalUsers,
-    loading,
-    login,
-    register,
-    logout,
-    isAdmin,
-    isLoggedIn,
-    updateProfile,
-    changePassword,
-    changeUserRole,
-    toggleUserStatus,
-    fetchAllUsers,
+    user, token, users, admins, normalUsers, loading,
+    login, register, logout, isAdmin, isLoggedIn,
+    updateProfile, changePassword, changeUserRole,
+    toggleUserStatus, fetchAllUsers,
   };
 
   return (
