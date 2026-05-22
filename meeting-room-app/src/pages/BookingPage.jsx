@@ -65,9 +65,10 @@ function BookingPage() {
   const location = useLocation();
   const { user } = useAuth();
   const {
-    getRoomById, getBookingsByRoom, getBookingsByRoomAndDate,
-    fetchBookingsByRoomAndDate, bookSlot, cancelBooking, addAdminRequest,
-  } = useRooms();
+  getRoomById, getBookingsByRoom, getBookingsByRoomAndDate,
+  fetchBookingsByRoomAndDate, bookSlot, cancelBooking, addAdminRequest,
+  bookings,
+} = useRooms();
 
   const selectedRoom = getRoomById(id);
 
@@ -153,14 +154,33 @@ function BookingPage() {
 
   // ── conflict check ────────────────────────────────────────────────────────
   function hasConflict(date, start, end) {
-    return getBookingsByRoomAndDate(selectedRoom.id, date).some((b) => {
-      const bS = new Date(`${date} ${b.startTime}`);
-      const bE = new Date(`${date} ${b.endTime}`);
-      const nS = new Date(`${date} ${start}`);
-      const nE = new Date(`${date} ${end}`);
-      return nS < bE && nE > bS;
-    });
-  }
+  // Check room conflict
+  const roomConflict = getBookingsByRoomAndDate(selectedRoom.id, date).some((b) => {
+    const bS = new Date(`${date} ${b.startTime}`);
+    const bE = new Date(`${date} ${b.endTime}`);
+    const nS = new Date(`${date} ${start}`);
+    const nE = new Date(`${date} ${end}`);
+    return nS < bE && nE > bS;
+  });
+
+  if (roomConflict) return true;
+
+  // Check if user already has booking at this time in ANY room
+  const userConflict = bookings.filter(b =>
+    b.userEmail === user?.email &&
+    b.date === date &&
+    b.status !== 'cancelled' &&
+    b.status !== 'completed'
+  ).some((b) => {
+    const bS = new Date(`${date} ${b.startTime}`);
+    const bE = new Date(`${date} ${b.endTime}`);
+    const nS = new Date(`${date} ${start}`);
+    const nE = new Date(`${date} ${end}`);
+    return nS < bE && nE > bS;
+  });
+
+  return userConflict;
+}
 
   // ── book ──────────────────────────────────────────────────────────────────
   async function handleBook() {
@@ -179,7 +199,20 @@ function BookingPage() {
         return nS < bE && nE > bS;
       });
       setConflict(true);
-      setConflictDetails({ slot: conflicting?.slot || `${formatTime(startTime)} – ${formatTime(endTime)}` });
+      const userExistingBooking = bookings.find(b =>
+  b.userEmail === user?.email &&
+  b.date === selectedDate &&
+  b.status !== 'cancelled' &&
+  b.status !== 'completed' &&
+  new Date(`${selectedDate} ${b.startTime}`) < new Date(`${selectedDate} ${endTime}`) &&
+  new Date(`${selectedDate} ${b.endTime}`) > new Date(`${selectedDate} ${startTime}`)
+);
+
+setConflictDetails({
+  slot: conflicting?.slot || userExistingBooking?.slot || `${formatTime(startTime)} – ${formatTime(endTime)}`,
+  isUserConflict: !!userExistingBooking,
+  conflictRoom: userExistingBooking?.roomName || '',
+});
       return;
     }
     setConflict(false); setLoading(true);
@@ -496,8 +529,8 @@ function BookingPage() {
     >
       <option value="">Select start time</option>
       {Array.from({ length: 96 }, (_, i) => {
-  const h = Math.floor(i / 4);
-  const m = String((i % 4) * 15).padStart(2, '0');
+        const h = Math.floor(i / 4);
+        const m = String((i % 4) * 15).padStart(2, '0');
         const value = `${String(h).padStart(2,'0')}:${m}`;
         const period = h >= 12 ? 'PM' : 'AM';
         const dh = h % 12 || 12;
@@ -565,9 +598,11 @@ function BookingPage() {
                 <div>
                   <p className="text-xs font-bold text-red-700 mb-1">Time Conflict</p>
                   <p className="text-xs text-red-600">
-                    This room is already booked for <span className="font-semibold">{conflictDetails.slot}</span>. 
-                    Please choose a different time or send an admin request.
-                  </p>
+  {conflictDetails.isUserConflict
+    ? <>You already have a booking in <span className="font-semibold">{conflictDetails.conflictRoom}</span> at <span className="font-semibold">{conflictDetails.slot}</span>. You cannot book multiple rooms at the same time.</>
+    : <>This room is already booked for <span className="font-semibold">{conflictDetails.slot}</span>. Please choose a different time or send an admin request.</>
+  }
+</p>
                 </div>
               </div>
             )}

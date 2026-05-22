@@ -97,23 +97,43 @@ const createBooking = async ({
     };
   }
 
-  const existingBookings = await Booking.find({
-    roomId,
-    date,
-    status: BOOKING_STATUS.CONFIRMED,
-  });
+ // Check if room is already booked at this time
+const roomConflict = await Booking.find({
+  roomId,
+  date,
+  status: { $in: [BOOKING_STATUS.CONFIRMED, 'checked-in'] },
+});
 
-  const conflict = existingBookings.find((booking) =>
-    hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
-  );
+const hasRoomConflict = roomConflict.find((booking) =>
+  hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
+);
 
-  if (conflict) {
-    return {
-      success: false,
-      statusCode: 409,
-      message: "This time conflicts with an existing booking.",
-    };
-  }
+if (hasRoomConflict) {
+  return {
+    success: false,
+    statusCode: 409,
+    message: "This room is already booked for the selected time.",
+  };
+}
+
+// Check if same user already has a booking at this time in ANY room
+const userConflict = await Booking.find({
+  userId: bookingUserId,
+  date,
+  status: { $in: [BOOKING_STATUS.CONFIRMED, 'checked-in'] },
+});
+
+const hasUserConflict = userConflict.find((booking) =>
+  hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
+);
+
+if (hasUserConflict) {
+  return {
+    success: false,
+    statusCode: 409,
+    message: `You already have a booking in ${hasUserConflict.roomName || 'another room'} at this time. You cannot book multiple rooms simultaneously.`,
+  };
+}
 
   const booking = await Booking.create({
     userId: bookingUserId,
