@@ -99,44 +99,43 @@ const createBooking = async ({
     };
   }
 
-  const existingBookings = await Booking.find({
-    roomId,
-    date,
-    status: { $in: ACTIVE_BOOKING_STATUSES },
-  });
+ // Check if room is already booked at this time
+const roomConflict = await Booking.find({
+  roomId,
+  date,
+  status: { $in: [BOOKING_STATUS.CONFIRMED, 'checked-in'] },
+});
 
-  const conflict = existingBookings.find((booking) =>
-    hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
-  );
+const hasRoomConflict = roomConflict.find((booking) =>
+  hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
+);
 
-  if (conflict) {
-    return {
-      success: false,
-      statusCode: 409,
-      message: "This time conflicts with an existing booking.",
-    };
-  }
+if (hasRoomConflict) {
+  return {
+    success: false,
+    statusCode: 409,
+    message: "This room is already booked for the selected time.",
+  };
+}
 
-  const existingUserBookings = await Booking.find({
-    userId: bookingUserId,
-    date,
-    status: { $in: ACTIVE_BOOKING_STATUSES },
-  });
+// Check if same user already has a booking at this time in ANY room
+const userConflict = await Booking.find({
+  userId: bookingUserId,
+  date,
+  status: { $in: [BOOKING_STATUS.CONFIRMED, 'checked-in'] },
+});
 
-  const userConflict = existingUserBookings.find((booking) =>
-    hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
-  );
+const hasUserConflict = userConflict.find((booking) =>
+  hasTimeConflict(booking.startTime, booking.endTime, startTime, endTime)
+);
 
-  if (userConflict) {
-    return {
-      success: false,
-      statusCode: 409,
-      message:
-        currentUser?.role === ROLES.ADMIN
-          ? "This user already has another room booked at this time."
-          : "You already have another room booked at this time.",
-    };
-  }
+if (hasUserConflict) {
+  return {
+    success: false,
+    statusCode: 409,
+    message: `You already have a booking in ${hasUserConflict.roomName || 'another room'} at this time. You cannot book multiple rooms simultaneously.`,
+  };
+}
 
   const booking = await Booking.create({
     userId: bookingUserId,
