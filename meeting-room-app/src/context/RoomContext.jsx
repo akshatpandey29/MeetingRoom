@@ -125,6 +125,30 @@ function mergeBookings(existingBookings, incomingBookings) {
   return sortBookingsByDateTime(Array.from(bookingMap.values()));
 }
 
+const HIDDEN_CALENDAR_STATUSES = new Set(["cancelled", "completed", "no-show"]);
+
+function isCalendarVisibleBooking(booking) {
+  return !HIDDEN_CALENDAR_STATUSES.has(
+    String(booking?.status || "").toLowerCase()
+  );
+}
+
+function isBookingForUser(booking, user) {
+  const currentUserId = String(user?.id || user?._id || "");
+  const bookingUserId = String(
+    booking?.userId?._id || booking?.userId?.id || booking?.userId || ""
+  );
+  const currentUserEmail = String(user?.email || "").toLowerCase();
+  const bookingUserEmail = String(
+    booking?.userEmail || booking?.userId?.email || ""
+  ).toLowerCase();
+
+  return (
+    (currentUserId && bookingUserId === currentUserId) ||
+    (currentUserEmail && bookingUserEmail === currentUserEmail)
+  );
+}
+
 export function RoomProvider({ children }) {
   const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
@@ -177,9 +201,16 @@ export function RoomProvider({ children }) {
       const response = await api.get("/bookings/my");
       const bookingList = response?.data?.data?.bookings || [];
       const normalized = sortBookingsByDateTime(bookingList.map(normalizeBooking));
-      // ── FIX: Store in both myBookings and bookings
       setMyBookings(normalized);
-      setBookings(normalized);
+      setBookings((previousBookings) => {
+        const otherUsersBookings = previousBookings.filter(
+          (booking) => !isBookingForUser(booking, user)
+        );
+        return mergeBookings(
+          otherUsersBookings,
+          normalized.filter(isCalendarVisibleBooking)
+        );
+      });
       return { success: true, message: response?.data?.message || "My bookings fetched successfully." };
     } catch (error) {
       const message = getErrorMessage(error, "My bookings could not be fetched.");
@@ -314,30 +345,37 @@ export function RoomProvider({ children }) {
 
   const getRoomById = (roomId) => rooms.find((room) => String(room.id) === String(roomId));
 
-  const getBookingsByRoom = (roomId) => bookings.filter((booking) => 
-  String(booking.roomId) === String(roomId) && 
-  booking.status !== 'cancelled' && 
-  booking.status !== 'completed'
-);
+  const getBookingsByRoom = (roomId) =>
+    bookings.filter(
+      (booking) =>
+        String(booking.roomId) === String(roomId) &&
+        isCalendarVisibleBooking(booking)
+    );
 
   const getBookingsByRoomAndDate = (roomId, date) => {
     return bookings.filter((booking) =>
       String(booking.roomId) === String(roomId) &&
       booking.date === date &&
-      booking.status !== "cancelled"
+      isCalendarVisibleBooking(booking)
     );
   };
 
- const fetchBookingsByRoomAndDate = async (roomId, date) => {
-  try {
-    const response = await api.get("/bookings/room-date", { params: { roomId, date } });
-    const bookingList = response?.data?.data?.bookings || [];
-    const normalizedBookings = bookingList.map(normalizeBooking);
-    setBookings((previousBookings) => mergeBookings(
-      previousBookings,
-      normalizedBookings.filter(b => b.status !== 'completed' && b.status !== 'cancelled')
-    ));
-    return normalizedBookings;
+  const fetchBookingsByRoomAndDate = async (roomId, date) => {
+    try {
+      const response = await api.get("/bookings/room-date", {
+        params: { roomId, date },
+      });
+      const bookingList = response?.data?.data?.bookings || [];
+      const normalizedBookings = bookingList.map(normalizeBooking);
+      const visibleBookings = normalizedBookings.filter(isCalendarVisibleBooking);
+      setBookings((previousBookings) => {
+        const bookingsOutsideRequestedSlot = previousBookings.filter(
+          (booking) =>
+            String(booking.roomId) !== String(roomId) || booking.date !== date
+        );
+        return mergeBookings(bookingsOutsideRequestedSlot, visibleBookings);
+      });
+      return normalizedBookings;
     } catch (error) {
       return bookings.filter((booking) =>
         String(booking.roomId) === String(roomId) && booking.date === date

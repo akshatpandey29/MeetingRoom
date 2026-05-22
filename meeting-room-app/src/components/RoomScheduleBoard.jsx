@@ -34,14 +34,19 @@ function RoomScheduleBoard({
   const [currentTime, setCurrentTime] = useState(() => new Date());
   const rangePickerRef = useRef(null);
 
+  const scheduleStartTime = useMemo(
+    () => getScheduleStartTime(selectedDate, currentTime),
+    [currentTime, selectedDate]
+  );
+
   const timeSlots = useMemo(
     () =>
       createTimeSlots(
-        SCHEDULE_START_TIME,
+        scheduleStartTime,
         SCHEDULE_END_TIME,
         SLOT_INTERVAL_MINUTES
       ),
-    []
+    [scheduleStartTime]
   );
 
   const visibleDates = useMemo(
@@ -50,8 +55,8 @@ function RoomScheduleBoard({
   );
 
   const currentTimeIndicator = useMemo(
-    () => getCurrentTimeIndicator(currentTime, selectedDate),
-    [currentTime, selectedDate]
+    () => getCurrentTimeIndicator(currentTime, selectedDate, scheduleStartTime),
+    [currentTime, scheduleStartTime, selectedDate]
   );
 
   const dateCards = useMemo(
@@ -79,7 +84,7 @@ function RoomScheduleBoard({
   const scheduleBookings = bookings.filter(
     (booking) =>
       visibleDates.includes(booking.date) &&
-      booking.status !== "cancelled" &&
+      isCalendarVisibleBooking(booking) &&
       rooms.some((room) => String(room.id) === String(booking.roomId))
   );
 
@@ -886,6 +891,18 @@ function createTimeSlots(start, end, intervalMinutes) {
   return slots;
 }
 
+function getScheduleStartTime(selectedDate, currentTime) {
+  if (selectedDate !== getTodayDate()) return SCHEDULE_START_TIME;
+
+  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+  const roundedStart =
+    Math.floor(currentMinutes / SLOT_INTERVAL_MINUTES) * SLOT_INTERVAL_MINUTES;
+
+  return minutesToTimeValue(
+    Math.min(roundedStart, 24 * 60 - SLOT_INTERVAL_MINUTES)
+  );
+}
+
 function getVisibleDates(selectedDate, scheduleMode) {
   if (scheduleMode === "month") {
     const selected = parseDateValue(selectedDate);
@@ -1065,10 +1082,10 @@ function addMinutesToTime(timeValue, minutesToAdd) {
   return minutesToTimeValue(Math.min(totalMinutes, 24 * 60 - 1));
 }
 
-function getCurrentTimeIndicator(currentTime, selectedDate) {
+function getCurrentTimeIndicator(currentTime, selectedDate, scheduleStartTime) {
   if (selectedDate !== getTodayDate()) return null;
 
-  const scheduleStartMinutes = convertTimeToMinutes(SCHEDULE_START_TIME);
+  const scheduleStartMinutes = convertTimeToMinutes(scheduleStartTime);
   const scheduleEndMinutes = convertTimeToMinutes(SCHEDULE_END_TIME);
   const currentMinutes =
     currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -1086,6 +1103,14 @@ function getCurrentTimeIndicator(currentTime, selectedDate) {
         (scheduleEndMinutes - scheduleStartMinutes)) *
       100,
   };
+}
+
+const HIDDEN_CALENDAR_STATUSES = new Set(["cancelled", "completed", "no-show"]);
+
+function isCalendarVisibleBooking(booking) {
+  return !HIDDEN_CALENDAR_STATUSES.has(
+    String(booking?.status || "").toLowerCase()
+  );
 }
 
 function isPastBooking(booking) {

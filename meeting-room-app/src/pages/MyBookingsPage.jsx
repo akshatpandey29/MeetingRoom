@@ -324,8 +324,6 @@ const { bookings, myBookings, cancelBooking, fetchMyBookings } = useRooms();
     if (response.data?.success) {
       showMessage('Meeting ended. Room is now free for others!', 'success');
       await fetchMyBookings();
-      // Force page reload to clear calendar state
-      setTimeout(() => window.location.reload(), 1500);
     }
       else {
         showMessage(response.data?.message || 'Failed to end meeting.', 'error');

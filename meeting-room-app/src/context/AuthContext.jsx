@@ -31,37 +31,28 @@ export const AuthProvider = ({ children }) => {
     let isMounted = true;
 
     const restoreSession = async () => {
-  try {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
+      try {
+        const response = await api.get("/auth/profile");
+        const profileUser = normalizeUser(response.data?.data?.user);
 
-    if (!savedToken || !savedUser) {
-      setLoading(false);
-      return;
-    }
-
-    // Verify token is still valid
-    const response = await api.get("/auth/profile");
-    const profileUser = normalizeUser(response.data?.data?.user);
-
-    if (isMounted && profileUser) {
-      setUser(profileUser);
-      setToken(savedToken);
-    }
-  } catch {
-    if (isMounted) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      setUser(null);
-      setToken(null);
-    }
-  } finally {
-    if (isMounted) {
-      setLoading(false);
-    }
-  }
-};
+        if (isMounted && profileUser) {
+          setUser(profileUser);
+          setToken("cookie-session");
+        }
+      } catch {
+        if (isMounted) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("refreshToken");
+          localStorage.removeItem("user");
+          setUser(null);
+          setToken(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
     restoreSession();
 
