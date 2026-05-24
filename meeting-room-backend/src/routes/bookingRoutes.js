@@ -159,10 +159,28 @@ router.post('/:id/extend', authenticate, async (req, res) => {
     const minutes = req.body.minutes || 15;
 
     const [eh, em] = booking.endTime.split(':').map(Number);
-    const totalMins = eh * 60 + em + minutes;
-    const newH = Math.floor(totalMins / 60) % 24;
-    const newM = totalMins % 60;
-    const newEndTime = `${String(newH).padStart(2,'0')}:${String(newM).padStart(2,'0')}`;
+const totalMins = eh * 60 + em + minutes;
+const newH = Math.floor(totalMins / 60) % 24;
+const newM = totalMins % 60;
+const newEndTime = `${String(newH).padStart(2,'0')}:${String(newM).padStart(2,'0')}`;
+
+// ── Check if extended time conflicts with another booking ─────────────────
+const conflictingBooking = await Booking.findOne({
+  roomId: booking.roomId,
+  date: booking.date,
+  _id: { $ne: booking._id }, // exclude current booking
+  status: { $in: ['confirmed', 'checked-in'] },
+  startTime: { $lt: newEndTime }, // other booking starts before new end
+  endTime: { $gt: booking.endTime }, // other booking ends after current end
+});
+
+if (conflictingBooking) {
+  return ApiResponse.error(
+    res,
+    `Cannot extend — another booking starts at ${conflictingBooking.startTime} in this room.`,
+    409
+  );
+}
 
     const [sh, sm] = booking.startTime.split(':').map(Number);
     const startFormatted = `${String(sh % 12 || 12).padStart(2,'0')}:${String(sm).padStart(2,'0')} ${sh >= 12 ? 'PM' : 'AM'}`;
