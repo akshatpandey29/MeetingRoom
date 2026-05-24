@@ -2110,7 +2110,7 @@ function BookingCard({
           <button
             type="button"
             onClick={onDeleteBooking}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-xl text-red-600 bg-red-200 px-3 text-sm font-semibold  transition hover:bg-red-300 active:scale-[0.98]"
+            className="admin-action-delete"
           >
             <FaTrash size={13} />
             Delete Record
@@ -2132,42 +2132,71 @@ function BookingTable({
   openModal,
 }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="bg-slate-50 text-left text-slate-600">
+    <div>
+      <table className="hidden w-full table-fixed text-sm lg:table">
+        <colgroup>
+          <col className="w-[22%]" />
+          <col className="w-[21%]" />
+          <col className="w-[12%]" />
+          <col className="w-[14%]" />
+          <col className="w-[31%]" />
+        </colgroup>
+
+        <thead className="bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="px-4 py-3 font-semibold">Room</th>
-            <th className="px-4 py-3 font-semibold">User</th>
-            <th className="px-4 py-3 font-semibold">Date</th>
-            <th className="px-4 py-3 font-semibold">Time</th>
-            <th className="px-4 py-3 font-semibold">Actions</th>
+            <th className="px-3 py-2.5 font-bold">Room</th>
+            <th className="px-3 py-2.5 font-bold">User</th>
+            <th className="px-3 py-2.5 font-bold">Date</th>
+            <th className="px-3 py-2.5 font-bold">Time</th>
+            <th className="px-3 py-2.5 font-bold">Actions</th>
           </tr>
         </thead>
 
         <tbody className="divide-y divide-slate-100">
           {bookings.map((booking) => (
-            <tr key={booking.id} className="hover:bg-slate-50">
-              <td className="px-4 py-4 font-semibold text-slate-900">
-                {booking.roomName}
+            <tr
+              key={booking.id}
+              className="group align-middle transition hover:bg-slate-50/80"
+            >
+              <td className="px-3 py-2.5">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition group-hover:bg-blue-50 group-hover:text-blue-600">
+                    <FaDoorOpen size={13} />
+                  </span>
+                  <p className="min-w-0 truncate text-[13px] font-semibold text-slate-900">
+                    {booking.roomName}
+                  </p>
+                </div>
               </td>
 
-              <td className="px-4 py-4">
-                <p className="font-semibold text-slate-800">
+              <td className="px-3 py-2.5">
+                <p className="truncate text-[13px] font-semibold text-slate-800">
                   {booking.bookedBy}
                 </p>
-                <p className="text-xs text-slate-500">{booking.userEmail}</p>
+                <p className="truncate text-[11px] text-slate-500">
+                  {booking.userEmail}
+                </p>
               </td>
 
-              <td className="px-4 py-4 text-slate-600">{booking.date}</td>
+              <td className="px-3 py-2.5">
+                <span className="whitespace-nowrap text-[13px] font-medium text-slate-700">
+                  {booking.date}
+                </span>
+              </td>
 
-              <td className="px-4 py-4 text-slate-600">{booking.slot}</td>
+              <td className="px-3 py-2.5">
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-slate-700">
+                  <FaClock size={11} className="text-blue-500" />
+                  {booking.slot}
+                </span>
+              </td>
 
-              <td className="px-4 py-4">
-                <div className="flex flex-wrap gap-2">
+              <td className="px-3 py-2.5">
+                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                   <button
                     type="button"
                     onClick={() => startReschedule(booking)}
-                    className="admin-action-blue"
+                    className="admin-table-action-blue"
                   >
                     <FaEdit size={13} />
                     Reschedule
@@ -2186,11 +2215,13 @@ function BookingTable({
                         payload: booking.id,
                       })
                     }
-                    className="admin-action-red"
+                    className="admin-table-action-red"
                   >
                     <FaTimesCircle size={13} />
-                    Cancel Booking
+                    Cancel
                   </button>
+
+                  <span className="mx-0.5 h-5 w-px bg-slate-200" />
 
                   <button
                     type="button"
@@ -2205,10 +2236,10 @@ function BookingTable({
                         payload: booking.id,
                       })
                     }
-                    className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-red-600 px-3 text-sm font-semibold text-white transition hover:bg-red-700 active:scale-[0.98]"
+                    className="admin-table-action-delete"
                   >
                     <FaTrash size={13} />
-                    Delete Record
+                    Delete
                   </button>
                 </div>
 
@@ -2279,6 +2310,175 @@ function BookingTable({
           ))}
         </tbody>
       </table>
+
+      <div className="space-y-3 p-3 lg:hidden">
+        {bookings.map((booking) => (
+          <article
+            key={`booking-card-${booking.id}`}
+            className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                <FaDoorOpen size={15} />
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h4 className="truncate text-sm font-bold text-slate-900">
+                      {booking.roomName}
+                    </h4>
+                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-600">
+                      {booking.bookedBy}
+                    </p>
+                    <p className="truncate text-[11px] text-slate-500">
+                      {booking.userEmail}
+                    </p>
+                  </div>
+
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                    {booking.date}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      Date
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                      <FaCalendarAlt size={11} className="text-blue-500" />
+                      {booking.date}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                      Time
+                    </p>
+                    <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                      <FaClock size={11} className="text-blue-500" />
+                      {booking.slot}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => startReschedule(booking)}
+                    className="admin-table-action-blue w-full"
+                  >
+                    <FaEdit size={13} />
+                    Reschedule
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openModal({
+                        type: "cancelBooking",
+                        title: "Cancel Booking",
+                        message:
+                          "Are you sure you want to cancel this booking?",
+                        confirmText: "Yes, Cancel",
+                        tone: "red",
+                        payload: booking.id,
+                      })
+                    }
+                    className="admin-table-action-red w-full"
+                  >
+                    <FaTimesCircle size={13} />
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openModal({
+                        type: "deleteBookingPermanent",
+                        title: "Delete Booking Record",
+                        message:
+                          "This will permanently delete this booking from the database. This cannot be undone.",
+                        confirmText: "Delete Permanently",
+                        tone: "red",
+                        payload: booking.id,
+                      })
+                    }
+                    className="admin-table-action-delete col-span-2 w-full sm:col-span-1"
+                  >
+                    <FaTrash size={13} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {editingBookingId === booking.id && (
+              <div className="mt-3 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 md:grid-cols-3">
+                <DateSelector
+                  value={editData.newDate}
+                  onChange={(value) =>
+                    setEditData((previous) => ({
+                      ...previous,
+                      newDate: value,
+                    }))
+                  }
+                  label="New Date"
+                />
+
+                <Field label="Start Time">
+                  <TimePickerWheel
+                    value={editData.newStartTime}
+                    onChange={(value) =>
+                      setEditData((previous) => ({
+                        ...previous,
+                        newStartTime: value,
+                        newEndTime: "",
+                      }))
+                    }
+                    label="Start time"
+                  />
+                </Field>
+
+                <Field label="End Time">
+                  <TimePickerWheel
+                    value={editData.newEndTime}
+                    onChange={(value) =>
+                      setEditData((previous) => ({
+                        ...previous,
+                        newEndTime: value,
+                      }))
+                    }
+                    disabled={!editData.newStartTime}
+                    label="End time"
+                  />
+                </Field>
+
+                <div className="flex gap-2 md:col-span-3">
+                  <button
+                    type="button"
+                    onClick={() => saveReschedule(booking)}
+                    className="admin-action-green flex-1"
+                  >
+                    <FaCheck size={13} />
+                    Save
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingBookingId(null)}
+                    className="admin-action-slate flex-1"
+                  >
+                    <FaTimes size={13} />
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
     </div>
   );
 }

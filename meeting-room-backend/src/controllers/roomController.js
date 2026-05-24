@@ -45,6 +45,14 @@ const roomValidation = [
   validateRequest,
 ];
 
+function isDuplicateKeyError(error) {
+  return error?.code === 11000;
+}
+
+function getDuplicateRoomNameMessage(name) {
+  return `A room named "${name}" already exists. Please use a different room name.`;
+}
+
 const getAllRooms = async (req, res, next) => {
   try {
     const { status, isActive } = req.query;
@@ -94,6 +102,15 @@ const getRoomById = async (req, res, next) => {
 
 const createRoom = async (req, res, next) => {
   try {
+    const existingRoom = await Room.findOne({ name: req.body.name });
+
+    if (existingRoom) {
+      return ApiResponse.conflict(
+        res,
+        getDuplicateRoomNameMessage(req.body.name)
+      );
+    }
+
     const room = await Room.create(req.body);
 
     logger.info(`Room created: ${room._id}`);
@@ -104,12 +121,33 @@ const createRoom = async (req, res, next) => {
       "Room created successfully"
     );
   } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return ApiResponse.conflict(
+        res,
+        getDuplicateRoomNameMessage(error.keyValue?.name || req.body.name)
+      );
+    }
+
     next(error);
   }
 };
 
 const updateRoom = async (req, res, next) => {
   try {
+    if (req.body.name) {
+      const existingRoom = await Room.findOne({
+        _id: { $ne: req.params.id },
+        name: req.body.name,
+      });
+
+      if (existingRoom) {
+        return ApiResponse.conflict(
+          res,
+          getDuplicateRoomNameMessage(req.body.name)
+        );
+      }
+    }
+
     const room = await Room.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -131,6 +169,13 @@ const updateRoom = async (req, res, next) => {
       "Room updated successfully"
     );
   } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      return ApiResponse.conflict(
+        res,
+        getDuplicateRoomNameMessage(error.keyValue?.name || req.body.name)
+      );
+    }
+
     next(error);
   }
 };

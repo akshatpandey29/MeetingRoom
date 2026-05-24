@@ -140,13 +140,22 @@ function RoomScheduleBoard({
   }
 
   function handleSlotClick(room, dateValue, startTime = DEFAULT_EMPTY_SLOT_START) {
-    if (isPastSlot(dateValue, startTime)) return;
+    const endTime = addMinutesToTime(startTime, SLOT_INTERVAL_MINUTES);
+    const userConflict = getUserSlotConflict(
+      scheduleBookings,
+      currentUser,
+      dateValue,
+      startTime,
+      endTime
+    );
+
+    if (isPastSlot(dateValue, startTime) || userConflict) return;
 
     navigate(`/book/${room.id}`, {
       state: {
         selectedDate: dateValue,
         startTime,
-        endTime: addMinutesToTime(startTime, SLOT_INTERVAL_MINUTES),
+        endTime,
         openBookingForm: true,
       },
     });
@@ -410,7 +419,26 @@ function RoomScheduleBoard({
                   )}
 
                   {timeSlots.map((slot, index) => {
-                    const disabled = isPastSlot(selectedDate, slot);
+                    const slotEndTime = addMinutesToTime(
+                      slot,
+                      SLOT_INTERVAL_MINUTES
+                    );
+                    const userConflict = getUserSlotConflict(
+                      scheduleBookings,
+                      currentUser,
+                      selectedDate,
+                      slot,
+                      slotEndTime
+                    );
+                    const disabled =
+                      isPastSlot(selectedDate, slot) || Boolean(userConflict);
+                    const conflictRoom = userConflict
+                      ? rooms.find(
+                          (candidateRoom) =>
+                            String(candidateRoom.id) ===
+                            String(userConflict.roomId)
+                        )
+                      : null;
 
                     return (
                       <button
@@ -425,7 +453,9 @@ function RoomScheduleBoard({
                         }`}
                         style={{ gridColumn: index + 1, gridRow: 1 }}
                         title={
-                          disabled
+                          userConflict
+                            ? `You already have a booking in ${conflictRoom?.name || "another room"} at this time`
+                            : disabled
                             ? "Past time"
                             : `Book ${room.name} at ${formatTime(slot)}`
                         }
@@ -657,7 +687,26 @@ function DateRangeGrid({
                 String(booking.roomId) === String(room.id) &&
                 booking.date === dateValue
             );
-            const disabled = isPastSlot(dateValue, DEFAULT_EMPTY_SLOT_START);
+            const slotEndTime = addMinutesToTime(
+              DEFAULT_EMPTY_SLOT_START,
+              SLOT_INTERVAL_MINUTES
+            );
+            const userConflict = getUserSlotConflict(
+              scheduleBookings,
+              currentUser,
+              dateValue,
+              DEFAULT_EMPTY_SLOT_START,
+              slotEndTime
+            );
+            const disabled =
+              isPastSlot(dateValue, DEFAULT_EMPTY_SLOT_START) ||
+              Boolean(userConflict);
+            const conflictRoom = userConflict
+              ? rooms.find(
+                  (candidateRoom) =>
+                    String(candidateRoom.id) === String(userConflict.roomId)
+                )
+              : null;
 
             return (
               <div
@@ -678,7 +727,13 @@ function DateRangeGrid({
                     ? "cursor-not-allowed bg-slate-50"
                     : "cursor-pointer bg-white hover:bg-blue-50"
                 }`}
-                title={disabled ? "Past date" : `Book ${room.name}`}
+                title={
+                  userConflict
+                    ? `You already have a booking in ${conflictRoom?.name || "another room"} at this time`
+                    : disabled
+                      ? "Past date"
+                      : `Book ${room.name}`
+                }
               >
                 <div className="space-y-2">
                   {dayBookings.map((booking) => {
@@ -1173,6 +1228,43 @@ function isPastSlot(dateValue, startTime) {
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
   return convertTimeToMinutes(startTime) <= currentMinutes;
+}
+
+function getUserSlotConflict(
+  bookings,
+  currentUser,
+  dateValue,
+  startTime,
+  endTime
+) {
+  if (!currentUser || !dateValue || !startTime || !endTime) return null;
+
+  return (
+    bookings.find((booking) => {
+      if (
+        booking.date !== dateValue ||
+        !isCurrentUserBooking(booking, currentUser)
+      ) {
+        return false;
+      }
+
+      const bookingStart = getBookingStartTime(booking);
+      const bookingEnd = getBookingEndTime(booking);
+
+      return hasTimeOverlap(startTime, endTime, bookingStart, bookingEnd);
+    }) || null
+  );
+}
+
+function hasTimeOverlap(startTime, endTime, existingStartTime, existingEndTime) {
+  if (!startTime || !endTime || !existingStartTime || !existingEndTime) {
+    return false;
+  }
+
+  return (
+    convertTimeToMinutes(startTime) < convertTimeToMinutes(existingEndTime) &&
+    convertTimeToMinutes(endTime) > convertTimeToMinutes(existingStartTime)
+  );
 }
 
 function getBookingGridColumn(booking, timeSlots) {
