@@ -66,8 +66,8 @@ function RoomCard({
 
   if (viewMode === "list") {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 p-3.5">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:items-center">
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 p-3">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 lg:items-center">
           <div className="lg:col-span-3">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -140,7 +140,7 @@ function RoomCard({
                 startTime,
                 endTime,
               }}
-              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-2 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-200"
+              className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-slate-100 px-2 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-200"
               title="View schedule"
             >
               <FaEye size={11} />
@@ -151,7 +151,7 @@ function RoomCard({
               <Link
                 to={bookingLink}
                 state={bookingState}
-                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700"
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2 py-1.5 text-[11px] font-semibold text-white transition-colors hover:bg-blue-700"
                 title="Book room"
               >
                 <FaCalendarAlt size={11} />
@@ -161,7 +161,7 @@ function RoomCard({
               <Link
                 to={bookingLink}
                 state={requestAdminState}
-                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-2 py-2 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                className="flex min-w-0 items-center justify-center gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
                 title="Request admin approval"
               >
                 <FaBell size={11} />
@@ -171,7 +171,7 @@ function RoomCard({
               <button
                 type="button"
                 disabled
-                className="flex min-w-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-2 py-2 text-[11px] font-semibold text-gray-400"
+                className="flex min-w-0 cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-semibold text-gray-400"
               >
                 <FaCalendarAlt size={11} />
                 <span className="truncate">{getBookButtonLabel(resolvedSlotStatus.type)}</span>
@@ -185,8 +185,8 @@ function RoomCard({
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden">
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3 mb-3">
+      <div className="p-3">
+        <div className="flex items-start justify-between gap-3 mb-2.5">
           <div>
             <h3 className="text-base font-semibold text-slate-900 leading-tight">
               {room.name}
@@ -201,11 +201,11 @@ function RoomCard({
           <StatusBadge status={resolvedSlotStatus.type} />
         </div>
 
-        <p className="text-xs text-slate-500 leading-relaxed mb-3 line-clamp-2">
+        <p className="text-xs text-slate-500 leading-relaxed mb-2 line-clamp-2">
           {room.description}
         </p>
 
-        <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-3">
+        <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-2">
           <FaUsers size={12} className="text-blue-500" />
 
           <span>
@@ -213,7 +213,7 @@ function RoomCard({
           </span>
         </div>
 
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="flex flex-wrap gap-1.5 mb-3">
           {room.amenities.slice(0, 4).map((amenity, index) => (
             <span
               key={index}
@@ -233,7 +233,7 @@ function RoomCard({
         <div
           className={`${getAvailabilityPanelClass(
             resolvedSlotStatus.type
-          )} border rounded-lg p-3 mb-3`}
+          )} border rounded-lg p-2.5 mb-2.5`}
         >
           <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-1">
             <FaClock size={11} className="text-blue-500" />
@@ -262,7 +262,7 @@ function RoomCard({
               startTime,
               endTime,
             }}
-            className="flex items-center justify-center gap-1.5 text-center bg-slate-100 text-slate-700 text-xs font-semibold py-2 rounded-lg hover:bg-slate-200 transition-colors duration-150"
+            className="flex items-center justify-center gap-1.5 text-center bg-slate-100 text-slate-700 text-xs font-semibold py-1.5 rounded-lg hover:bg-slate-200 transition-colors duration-150"
           >
             <FaEye size={11} />
             View Calendar
@@ -272,7 +272,7 @@ function RoomCard({
             <Link
               to={bookingLink}
               state={bookingState}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-2 text-center text-xs font-semibold text-white transition-colors duration-150 hover:bg-blue-700"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 py-1.5 text-center text-xs font-semibold text-white transition-colors duration-150 hover:bg-blue-700"
             >
               <FaCalendarAlt size={11} />
               Book Room
@@ -281,7 +281,7 @@ function RoomCard({
             <Link
               to={bookingLink}
               state={requestAdminState}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-50 py-2 text-center text-xs font-semibold text-amber-700 transition-colors duration-150 hover:bg-amber-100"
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-50 py-1.5 text-center text-xs font-semibold text-amber-700 transition-colors duration-150 hover:bg-amber-100"
             >
               <FaBell size={11} />
               Request Admin
@@ -290,7 +290,7 @@ function RoomCard({
             <button
               type="button"
               disabled
-              className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-gray-100 py-2 text-center text-xs font-semibold text-gray-400"
+              className="flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-lg bg-gray-100 py-1.5 text-center text-xs font-semibold text-gray-400"
             >
               <FaCalendarAlt size={11} />
               {getBookButtonLabel(resolvedSlotStatus.type)}
@@ -372,7 +372,7 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap ${selectedBadge.className}`}
+      className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${selectedBadge.className}`}
     >
       {selectedBadge.label}
     </span>

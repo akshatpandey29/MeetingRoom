@@ -23,6 +23,7 @@ function TimePickerWheel({
 
   const minTimeMinutes = parseTimeToMinutes(minTime);
   const isLarge = size === "large";
+  const isCompact = size === "compact";
 
   // parse value when it changes externally
   useEffect(() => {
@@ -104,7 +105,11 @@ function TimePickerWheel({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         className={`w-full overflow-hidden text-ellipsis whitespace-nowrap border rounded-xl text-left transition-all
-          ${isLarge ? "px-4 py-3.5 text-base" : "px-3 py-2.5 text-sm"}
+          ${isLarge
+            ? "px-4 py-3.5 text-base"
+            : isCompact
+              ? "px-3 py-2 text-sm"
+              : "px-3 py-2.5 text-sm"}
           ${disabled
             ? 'bg-gray-50 border-gray-100 text-gray-400 cursor-not-allowed'
             : 'bg-white border-gray-200 text-slate-800 hover:border-blue-400 cursor-pointer'

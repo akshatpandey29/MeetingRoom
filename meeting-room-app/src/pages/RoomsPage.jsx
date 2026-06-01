@@ -650,8 +650,8 @@ function RoomsPage() {
   });
 
   return (
-    <section className="min-h-screen px-4 py-4 md:px-6 md:py-5 bg-slate-50">
-      <div className="mb-3 max-w-7xl mx-auto px-2 md:px-4 py-2">
+    <section className="min-h-screen px-4 py-3 md:px-6 md:py-4 bg-slate-50">
+      <div className="mb-2 max-w-7xl mx-auto px-2 md:px-4 py-1">
           <p className="text-lg font-bold text-blue-600 uppercase tracking-wide">
             Meeting Rooms
           </p>
@@ -667,20 +667,20 @@ function RoomsPage() {
           fetchBookingsByRoomAndDate={fetchBookingsByRoomAndDate}
         />
 
-        <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
           <div className="grid grid-cols-1 lg:grid-cols-[0.78fr_1.62fr]">
-            <aside className="bg-slate-950 px-6 py-6 text-white md:px-7 lg:min-h-[430px]">
+            <aside className="bg-slate-950 px-5 py-5 text-white md:px-6 lg:min-h-[360px]">
 
-              <h1 className="mt-2 max-w-sm text-3xl font-bold">
+              <h1 className="mt-1 max-w-sm text-2xl font-bold">
                 Find a Room
               </h1>
 
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
+              <p className="mt-2 max-w-md text-sm leading-5 text-slate-300">
                 Select a future slot first. RoomBook will show matching rooms with
                 clear availability before you move to the booking page.
               </p>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-5 space-y-3">
                 <GuideStep
                   number="1"
                   title="Choose the meeting time"
@@ -698,23 +698,23 @@ function RoomsPage() {
                 />
               </div>
 
-              <div className="mt-6 border-t border-white/10 pt-5">
+              <div className="mt-5 border-t border-white/10 pt-4">
                 <p className="text-xs font-semibold uppercase text-slate-400">
                   Selected slot
                 </p>
-                <p className="mt-2 text-base font-bold text-white">
+                <p className="mt-1.5 text-base font-bold text-white">
                   {selectedSlotText || "No time selected yet"}
                 </p>
-                <p className="mt-2 text-xs leading-5 text-slate-400">
+                <p className="mt-1.5 text-xs leading-5 text-slate-400">
                   Fields marked with a red dot are required before rooms can be shown.
                 </p>
               </div>
             </aside>
 
-            <div className="px-5 py-5 sm:px-6 sm:py-6 xl:px-8 xl:py-6">
-              <div className="mb-5 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="px-4 py-4 sm:px-5 sm:py-5 xl:px-6 xl:py-5">
+              <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
                     <FaCalendarAlt size={16} />
                   </div>
 
@@ -737,13 +737,13 @@ function RoomsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
                 <DateSelector
                   value={selectedDate}
                   onChange={handleDateChange}
                   label="Date"
                   required
-                  size="default"
+                  size="compact"
                 />
 
                 <CompactField
@@ -760,7 +760,7 @@ function RoomsPage() {
                     minTimeMessage={
                       minimumStartTime ? "Past times are disabled for today." : ""
                     }
-                    size="default"
+                    size="compact"
                   />
                 </CompactField>
 
@@ -778,78 +778,78 @@ function RoomsPage() {
                     minTimeMessage={
                       minimumEndTime ? "Choose a valid future end time." : ""
                     }
-                    size="default"
+                    size="compact"
                   />
                 </CompactField>
 
-                <div className="xl:col-span-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 shadow-sm">
-  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-    <div>
-      <p className="text-sm font-bold text-slate-950">
-        Recommended slots
-      </p>
+                <div className="xl:col-span-3 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 shadow-sm">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-slate-950">
+                        Recommended slots
+                      </p>
 
-      <p className="mt-0.5 text-xs text-slate-500">
-        Choose a common duration.
-      </p>
-    </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        Choose a common duration.
+                      </p>
+                    </div>
 
-    <span className="w-fit rounded-full border border-blue-100 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
-      Quick select
-    </span>
-  </div>
+                    <span className="w-fit rounded-full border border-blue-100 bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-blue-700">
+                      Quick select
+                    </span>
+                  </div>
 
-  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-    {recommendedSlots.map((slot) => {
-      const isSelectedRecommendedSlot =
-        selectedDate === slot.date &&
-        startTime === slot.start &&
-        endTime === slot.end;
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {recommendedSlots.map((slot) => {
+                      const isSelectedRecommendedSlot =
+                        selectedDate === slot.date &&
+                        startTime === slot.start &&
+                        endTime === slot.end;
 
-      return (
-        <button
-          key={slot.key}
-          type="button"
-          onClick={() => handleRecommendedSlotSelect(slot)}
-          disabled={slot.disabled}
-          className={`rounded-xl border px-3 py-3 text-left transition ${
-            slot.disabled
-              ? "cursor-not-allowed border-slate-100 bg-white/60 text-slate-400"
-              : isSelectedRecommendedSlot
-                ? "border-blue-600 bg-blue-50 shadow-sm"
-                : "border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white hover:shadow-sm"
-          }`}
-        >
-          <span
-            className={`block text-[10px] font-black uppercase tracking-[0.1em] ${
-              slot.disabled
-                ? "text-slate-400"
-                : isSelectedRecommendedSlot
-                  ? "text-blue-700"
-                  : "text-slate-500"
-            }`}
-          >
-            {slot.title}
-          </span>
+                      return (
+                        <button
+                          key={slot.key}
+                          type="button"
+                          onClick={() => handleRecommendedSlotSelect(slot)}
+                          disabled={slot.disabled}
+                          className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                            slot.disabled
+                              ? "cursor-not-allowed border-slate-100 bg-white/60 text-slate-400"
+                              : isSelectedRecommendedSlot
+                                ? "border-blue-600 bg-blue-50 shadow-sm"
+                                : "border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white hover:shadow-sm"
+                          }`}
+                        >
+                          <span
+                            className={`block text-[10px] font-black uppercase tracking-[0.1em] ${
+                              slot.disabled
+                                ? "text-slate-400"
+                                : isSelectedRecommendedSlot
+                                  ? "text-blue-700"
+                                  : "text-slate-500"
+                            }`}
+                          >
+                            {slot.title}
+                          </span>
 
-          <span
-            className={`mt-1 block text-sm font-bold ${
-              slot.disabled ? "text-slate-400" : "text-slate-950"
-            }`}
-          >
-            {slot.disabled
-              ? "Not enough time"
-              : `${formatTime(slot.start)} - ${formatTime(slot.end)}`}
-          </span>
+                          <span
+                            className={`mt-1 block text-sm font-bold ${
+                              slot.disabled ? "text-slate-400" : "text-slate-950"
+                            }`}
+                          >
+                            {slot.disabled
+                              ? "Not enough time"
+                              : `${formatTime(slot.start)} - ${formatTime(slot.end)}`}
+                          </span>
 
-          <span className="mt-1 block text-xs text-slate-500">
-            {formatSlotDateLabel(slot.date)} · {slot.description}
-          </span>
-        </button>
-      );
-    })}
-  </div>
-</div>
+                          <span className="mt-1 block text-xs text-slate-500">
+                            {formatSlotDateLabel(slot.date)} · {slot.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 <CompactField
                   icon={<FaBuilding className="text-blue-500" size={14} />}
@@ -858,7 +858,7 @@ function RoomsPage() {
                   <select
                     value={floorFilter}
                     onChange={(event) => handleFloorChange(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">Any floor</option>
                     {floorOptions.map((floor) => (
@@ -870,19 +870,19 @@ function RoomsPage() {
                 </CompactField>
 
                 <div className="xl:col-span-2">
-                  <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <FaUsers className="text-blue-500" size={14} />
                     Capacity
                   </label>
 
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {capacityOptions.map((option) => (
                       <button
                         key={option.key}
                         type="button"
                         onClick={() => handleCapacityChange(option)}
                         disabled={!option.isAvailable}
-                        className={`min-h-11 rounded-xl border px-3 py-2.5 text-sm font-bold transition-all ${
+                        className={`min-h-10 rounded-xl border px-3 py-2 text-sm font-bold transition-all ${
                           capacityKey === option.key
                             ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
                             : !option.isAvailable
@@ -906,13 +906,13 @@ function RoomsPage() {
                     placeholder="Projector, whiteboard, room name..."
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                 </CompactField>
               </div>
 
               {(isInvalidTimeRange || isPastStartTime || formErrorMessage) && (
-                <p className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                <p className="mt-3 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600">
                   {formErrorMessage ||
                     (isPastStartTime
                       ? "Start time must be current or future."
@@ -920,12 +920,12 @@ function RoomsPage() {
                 </p>
               )}
 
-              <div className="mt-5 flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center">
+              <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   onClick={handleShowRooms}
                   disabled={!canShowAvailableRooms}
-                  className={`min-h-12 flex-1 rounded-xl px-6 py-3 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                  className={`min-h-10 flex-1 rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
                     canShowAvailableRooms
                       ? "bg-blue-700 text-white hover:bg-blue-800"
                       : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
@@ -936,7 +936,7 @@ function RoomsPage() {
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="min-h-12 rounded-xl px-6 py-3 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-100"
+                  className="min-h-10 rounded-xl px-5 py-2.5 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-100"
                 >
                   Clear
                 </button>
@@ -949,7 +949,7 @@ function RoomsPage() {
           <>
             <div
               ref={resultsRef}
-              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 scroll-mt-24"
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 scroll-mt-24"
             >
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">
@@ -996,8 +996,8 @@ function RoomsPage() {
                 key={viewMode}
                 className={`transition-all duration-300 ease-out animate-[fadeSlide_0.28s_ease-out] ${
                   viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
-                    : "space-y-3"
+                    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
+                    : "space-y-2.5"
                 }`}
               >
                 {filteredRooms.map((room, index) => (
@@ -1022,7 +1022,7 @@ function RoomsPage() {
                 ))}
               </div>
             ) : (
-              <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+              <div className="bg-white border border-gray-200 rounded-xl p-4 text-center">
                 <h3 className="text-base font-semibold text-slate-800 mb-1">
                   No rooms found
                 </h3>
@@ -1057,7 +1057,7 @@ function RoomsPage() {
 function CompactField({ icon, label, required = false, className = "", children }) {
   return (
     <div className={className}>
-      <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+      <label className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-700">
         {icon}
         {label}
         {required && <span className="text-red-500">•</span>}
@@ -1070,12 +1070,12 @@ function CompactField({ icon, label, required = false, className = "", children 
 function GuideStep({ number, title, description }) {
   return (
     <div className="flex gap-3">
-      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
         {number}
       </div>
       <div>
         <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">{description}</p>
+        <p className="mt-0.5 text-xs leading-5 text-slate-400">{description}</p>
       </div>
     </div>
   );

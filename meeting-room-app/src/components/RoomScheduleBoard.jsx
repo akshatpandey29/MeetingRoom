@@ -193,17 +193,17 @@ function RoomScheduleBoard({
   }
 
   return (
-    <section className="room-schedule-board mb-7 rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-gray-100 px-4 py-4 sm:px-6 sm:py-5 lg:flex-row lg:items-center lg:justify-between">
+    <section className="room-schedule-board mb-4 rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 sm:h-11 sm:w-11">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 sm:h-10 sm:w-10">
             <FaCalendarAlt size={17} />
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900">
               Room Calendar
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-0.5 text-sm text-slate-500">
               Blue bookings are yours. Gray bookings belong to other users.
             </p>
           </div>
@@ -216,7 +216,7 @@ function RoomScheduleBoard({
                 type="button"
                 key={mode.key}
                 onClick={() => setScheduleMode(mode.key)}
-                className={`flex-1 rounded-lg px-3 py-2 text-sm font-bold transition sm:flex-none sm:px-4 ${
+                className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-bold transition sm:flex-none sm:px-4 ${
                   scheduleMode === mode.key
                     ? "bg-blue-100 text-blue-700 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
@@ -231,7 +231,7 @@ function RoomScheduleBoard({
               type="button"
               onClick={() => moveDate(-1)}
               disabled={selectedDate <= getTodayDate()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
               aria-label="Previous calendar range"
             >
               <FaChevronLeft size={13} />
@@ -243,7 +243,7 @@ function RoomScheduleBoard({
                 onClick={() =>
                   setIsRangePickerOpen((currentValue) => !currentValue)
                 }
-                className={`flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition sm:w-auto sm:justify-between sm:px-4 ${
+                className={`flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-semibold transition sm:w-auto sm:justify-between sm:px-4 ${
                   isRangePickerOpen
                     ? "border-blue-500 text-blue-700 ring-2 ring-blue-100"
                     : "border-gray-200 text-slate-700 hover:border-blue-300 hover:bg-blue-50"
@@ -290,7 +290,7 @@ function RoomScheduleBoard({
             <button
               type="button"
               onClick={() => moveDate(1)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition hover:bg-slate-50"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 text-slate-600 transition hover:bg-slate-50"
               aria-label="Next calendar range"
             >
               <FaChevronRight size={13} />
@@ -300,25 +300,25 @@ function RoomScheduleBoard({
       </div>
 
       {scheduleMode !== "month" && (
-        <div className="border-b border-gray-100 bg-slate-50/60 px-3 py-4 sm:px-6">
-          <div className="flex items-center gap-3">
+        <div className="border-b border-gray-100 bg-slate-50/60 px-3 py-3 sm:px-5">
+          <div className="flex items-center gap-2.5">
             <button
               type="button"
               onClick={() => moveDate(-1)}
               disabled={selectedDate <= getTodayDate()}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-blue-100"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-blue-100"
               aria-label="Previous date"
             >
               <FaChevronLeft size={13} />
             </button>
 
-            <div className="room-date-strip flex flex-1 gap-3 overflow-x-auto pb-1">
+            <div className="room-date-strip flex flex-1 gap-2.5 overflow-x-auto pb-1">
               {dateCards.map((dateValue) => (
                 <button
                   type="button"
                   key={dateValue}
                   onClick={() => onDateChange(dateValue)}
-                  className={`min-w-[76px] rounded-xl border px-3 py-3 text-center transition sm:min-w-28 sm:px-4 ${
+                  className={`min-w-[70px] rounded-xl border px-3 py-2.5 text-center transition sm:min-w-24 sm:px-4 ${
                     dateValue === selectedDate
                       ? "border-blue-200 bg-blue-100 text-blue-700"
                       : "border-gray-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50"
@@ -327,7 +327,7 @@ function RoomScheduleBoard({
                   <span className="block text-xs font-semibold">
                     {formatDatePart(dateValue, "weekday")}
                   </span>
-                  <span className="mt-1 block text-2xl font-bold text-slate-950">
+                  <span className="mt-0.5 block text-xl font-bold text-slate-950">
                     {formatDatePart(dateValue, "day")}
                   </span>
                   <span className="block text-xs font-semibold">
@@ -340,7 +340,7 @@ function RoomScheduleBoard({
             <button
               type="button"
               onClick={() => moveDate(1)}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 transition hover:bg-blue-50"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-600 transition hover:bg-blue-50"
               aria-label="Next date"
             >
               <FaChevronRight size={13} />
@@ -351,20 +351,20 @@ function RoomScheduleBoard({
 
       <div className="room-schedule-scroll overflow-x-auto">
         {scheduleMode === "days" ? (
-        <div className="min-w-full">
+        <div className="w-max min-w-full">
           <div
             className="grid border-b border-gray-200 bg-slate-50"
             style={{
               gridTemplateColumns: `var(--schedule-room-column) repeat(${timeSlots.length}, var(--schedule-time-column))`,
             }}
           >
-            <div className="sticky left-0 z-30 border-r border-gray-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-800 sm:px-5">
+            <div className="room-sticky-cell sticky left-0 z-40 border-r border-gray-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-800 sm:px-4">
               Rooms
             </div>
             {timeSlots.map((slot) => (
               <div
                 key={slot}
-                className="border-r border-gray-200 px-2 py-3 text-sm font-semibold leading-tight text-slate-700 last:border-r-0 sm:px-3"
+                className="border-r border-gray-200 px-2 py-2.5 text-sm font-semibold leading-tight text-slate-700 last:border-r-0 sm:px-3"
               >
                 {formatTime(slot)}
               </div>
@@ -386,33 +386,33 @@ function RoomScheduleBoard({
                   gridTemplateColumns: `var(--schedule-room-column) repeat(${timeSlots.length}, var(--schedule-time-column))`,
                 }}
               >
-                <div className="sticky left-0 z-20 border-r border-gray-200 bg-white px-3 py-4 sm:px-5 sm:py-5">
+                <div className="room-sticky-cell sticky left-0 z-40 border-r border-gray-200 bg-white px-3 py-3 sm:px-4 sm:py-4">
                   <p className="break-words text-sm font-bold text-slate-900">{room.name}</p>
                   <p className="mt-1 break-words text-xs font-medium text-slate-500">
                     {room.location}
                   </p>
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="mt-1.5 text-xs text-slate-400">
                     {room.capacity} people
                   </p>
                 </div>
 
                 <div
-                  className="relative grid min-h-28"
+                  className="relative grid min-h-[88px]"
                   style={{
                     gridColumn: `2 / ${timeSlots.length + 2}`,
                     gridTemplateColumns: `repeat(${timeSlots.length}, var(--schedule-time-column))`,
-                    gridTemplateRows: "112px",
+                    gridTemplateRows: "88px",
                   }}
                 >
                   {currentTimeIndicator && (
                     <div
-                      className="pointer-events-none absolute inset-y-0 z-20 w-0.5 bg-red-500"
+                      className="room-current-time-marker pointer-events-none absolute inset-y-0 w-0.5 bg-red-500"
                       style={{ left: `${currentTimeIndicator.percent}%` }}
                       aria-hidden="true"
                     >
                       {roomIndex === 0 && (
-                        <span className="absolute left-1/2 top-2 -translate-x-1/2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
-                          Now
+                        <span className="absolute left-1 top-2 whitespace-nowrap rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm">
+                          {formatCurrentTimeLabel(currentTime)}
                         </span>
                       )}
                     </div>
@@ -483,7 +483,7 @@ function RoomScheduleBoard({
                           }
                         }}
                         aria-disabled={!canOpenBooking}
-                        className={`z-10 m-2 self-center rounded-xl px-3 py-2 text-left text-white shadow-sm transition ${
+                        className={`room-calendar-event z-10 m-1.5 self-center overflow-hidden rounded-xl px-2.5 py-1.5 text-left text-white shadow-sm transition ${
                           isMine ? "bg-blue-600" : "bg-slate-500"
                         } ${
                           canOpenBooking
@@ -499,13 +499,17 @@ function RoomScheduleBoard({
                               : "Other user's booking"
                         }
                       >
-                        <span className="block truncate text-xs font-bold">
-                          {isMine ? "Your booking" : booking.bookedBy || "Booked"}
+                        <span className="room-calendar-event-title block truncate text-xs font-bold">
+                          {isMine ? "Your booking" : "Other booking"}
                         </span>
-                        <span className="mt-1 flex items-center gap-1 text-[11px] font-medium opacity-90">
-                          <FaClock size={10} />
-                          {formatTime(getBookingStartTime(booking))} -{" "}
-                          {formatTime(getBookingEndTime(booking))}
+                        <span className="room-calendar-event-time mt-1 flex min-w-0 items-center gap-1 text-[11px] font-medium opacity-90">
+                          <FaClock className="room-calendar-event-icon shrink-0" size={10} />
+                          <span className="min-w-0 truncate">
+                            {formatCompactTimeRange(
+                              getBookingStartTime(booking),
+                              getBookingEndTime(booking)
+                            )}
+                          </span>
                         </span>
                       </button>
                     );
@@ -561,7 +565,41 @@ function RoomScheduleBoard({
           }
 
           .room-schedule-scroll {
+            max-width: 100%;
+            overflow-y: visible;
+            position: relative;
+            overscroll-behavior-x: contain;
             scrollbar-width: thin;
+          }
+
+          .room-sticky-cell {
+            left: 0;
+            overflow: hidden;
+            position: sticky;
+            transform: translateZ(0);
+            width: var(--schedule-room-column);
+            min-width: var(--schedule-room-column);
+            max-width: var(--schedule-room-column);
+            z-index: 60;
+            box-shadow: 1px 0 0 #e5e7eb;
+          }
+
+          .room-current-time-marker {
+            z-index: 30;
+          }
+
+          .room-calendar-event {
+            height: calc(100% - 0.75rem);
+            max-height: 4.75rem;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.125rem;
+          }
+
+          .room-calendar-event-time {
+            white-space: nowrap;
           }
 
           .room-range-picker-popover .react-datepicker {
@@ -601,9 +639,34 @@ function RoomScheduleBoard({
 
           @media (max-width: 639px) {
             .room-schedule-board {
-              --schedule-room-column: 164px;
+              --schedule-room-column: 176px;
               --schedule-time-column: 68px;
               --schedule-date-column: 112px;
+            }
+
+            .room-calendar-event {
+              height: calc(100% - 0.5rem);
+              max-height: 3.75rem;
+              min-height: 2.75rem;
+              margin: 0.25rem;
+              border-radius: 0.75rem;
+              padding: 0.35rem 0.45rem;
+              gap: 0.05rem;
+            }
+
+            .room-calendar-event-title {
+              font-size: 0.68rem;
+              line-height: 0.9rem;
+            }
+
+            .room-calendar-event-time {
+              margin-top: 0.125rem;
+              font-size: 0.62rem;
+              line-height: 0.8rem;
+            }
+
+            .room-calendar-event-icon {
+              display: none;
             }
 
             .room-range-picker-popover .react-datepicker__month-wrapper {
@@ -636,22 +699,20 @@ function DateRangeGrid({
   onBookingClick,
 }) {
   return (
-    <div
-      className="min-w-full"
-    >
+    <div className="w-max min-w-full">
       <div
         className="grid border-b border-gray-200 bg-slate-50"
         style={{
           gridTemplateColumns: `var(--schedule-room-column) repeat(${visibleDates.length}, var(--schedule-date-column))`,
         }}
       >
-        <div className="sticky left-0 z-30 border-r border-gray-200 bg-slate-50 px-3 py-3 text-sm font-bold text-slate-800 sm:px-5">
+        <div className="room-sticky-cell sticky left-0 z-40 border-r border-gray-200 bg-slate-50 px-3 py-2.5 text-sm font-bold text-slate-800 sm:px-4">
           Rooms
         </div>
         {visibleDates.map((dateValue) => (
           <div
             key={dateValue}
-            className={`border-r border-gray-200 px-3 py-3 text-sm font-semibold last:border-r-0 ${
+            className={`border-r border-gray-200 px-3 py-2.5 text-sm font-semibold last:border-r-0 ${
               dateValue === getTodayDate() ? "text-blue-700" : "text-slate-700"
             }`}
           >
@@ -673,12 +734,12 @@ function DateRangeGrid({
             gridTemplateColumns: `var(--schedule-room-column) repeat(${visibleDates.length}, var(--schedule-date-column))`,
           }}
         >
-          <div className="sticky left-0 z-20 border-r border-gray-200 bg-white px-3 py-4 sm:px-5 sm:py-5">
+          <div className="room-sticky-cell sticky left-0 z-40 border-r border-gray-200 bg-white px-3 py-3 sm:px-4 sm:py-4">
             <p className="break-words text-sm font-bold text-slate-900">{room.name}</p>
             <p className="mt-1 break-words text-xs font-medium text-slate-500">
               {room.location}
             </p>
-            <p className="mt-2 text-xs text-slate-400">{room.capacity} people</p>
+            <p className="mt-1.5 text-xs text-slate-400">{room.capacity} people</p>
           </div>
 
           {visibleDates.map((dateValue) => {
@@ -722,7 +783,7 @@ function DateRangeGrid({
                     onSlotClick(room, dateValue, DEFAULT_EMPTY_SLOT_START);
                   }
                 }}
-                className={`min-h-28 border-r border-gray-100 p-2 last:border-r-0 ${
+                className={`min-h-24 border-r border-gray-100 p-1.5 last:border-r-0 ${
                   disabled
                     ? "cursor-not-allowed bg-slate-50"
                     : "cursor-pointer bg-white hover:bg-blue-50"
@@ -751,7 +812,7 @@ function DateRangeGrid({
                           }
                         }}
                         aria-disabled={!canOpenBooking}
-                        className={`w-full rounded-lg px-2.5 py-2 text-left text-white shadow-sm transition ${
+                        className={`w-full rounded-lg px-2 py-1.5 text-left text-white shadow-sm transition ${
                           isMine ? "bg-blue-600" : "bg-slate-500"
                         } ${
                           canOpenBooking
@@ -804,7 +865,7 @@ function MonthCalendarGrid({
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((weekday) => (
           <div
             key={weekday}
-            className="border-r border-gray-200 px-3 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
+            className="border-r border-gray-200 px-3 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-500 last:border-r-0"
           >
             {weekday}
           </div>
@@ -840,7 +901,7 @@ function MonthCalendarGrid({
                   onDateSelect(dateValue);
                 }
               }}
-              className={`min-h-36 border-r border-b border-gray-100 p-2 last:border-r-0 ${
+              className={`min-h-28 border-r border-b border-gray-100 p-1.5 last:border-r-0 ${
                 isCurrentMonth ? "bg-white" : "bg-slate-50/70"
               } ${
                 isSelectableDate
@@ -853,9 +914,9 @@ function MonthCalendarGrid({
                   : "Past date"
               }
             >
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-1.5 flex items-center justify-between">
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold ${
+                  className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                     isToday
                       ? "bg-blue-600 text-white"
                       : isCurrentMonth
@@ -873,7 +934,7 @@ function MonthCalendarGrid({
                 )}
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {dayBookings.slice(0, 3).map((booking) => {
                   const isMine = isCurrentUserBooking(booking, currentUser);
                   const canOpenBooking = isMine && !isPastBooking(booking);
@@ -890,7 +951,7 @@ function MonthCalendarGrid({
                         }
                       }}
                       aria-disabled={!canOpenBooking}
-                      className={`w-full rounded-lg px-2 py-1.5 text-left text-white shadow-sm transition ${
+                      className={`w-full rounded-lg px-2 py-1 text-left text-white shadow-sm transition ${
                         isMine ? "bg-blue-600" : "bg-slate-500"
                       } ${
                         canOpenBooking
@@ -1088,6 +1149,47 @@ function formatDatePart(dateValue, part) {
   };
 
   return parseDateValue(dateValue).toLocaleDateString("en-IN", options[part]);
+}
+
+function formatCurrentTimeLabel(date) {
+  const hour = date.getHours();
+  const minute = date.getMinutes();
+  const period = hour >= 12 ? "pm" : "am";
+  const displayHour = hour % 12 || 12;
+
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+function formatCompactTimeRange(startTime, endTime) {
+  if (!startTime || !endTime) return "";
+
+  const start = getTimeParts(startTime);
+  const end = getTimeParts(endTime);
+
+  if (!start || !end) return "";
+
+  const startLabel =
+    start.period === end.period
+      ? `${start.hour}:${start.minute}`
+      : `${start.hour}:${start.minute} ${start.period}`;
+
+  return `${startLabel} - ${end.hour}:${end.minute} ${end.period}`;
+}
+
+function getTimeParts(timeValue) {
+  if (!timeValue) return null;
+
+  const [hour, minute] = String(timeValue).split(":").map(Number);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+
+  return {
+    hour: String(displayHour).padStart(2, "0"),
+    minute: String(minute).padStart(2, "0"),
+    period,
+  };
 }
 
 function formatDateRange(startDate, endDate) {

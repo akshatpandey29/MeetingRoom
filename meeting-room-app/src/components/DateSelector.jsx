@@ -24,6 +24,7 @@ function DateSelector({
 
   const selectedDate = parseDateString(value);
   const isLarge = size === "large";
+  const isCompact = size === "compact";
 
   const formatDateForState = (date) => {
     const year = date.getFullYear();
@@ -59,9 +60,9 @@ function DateSelector({
   return (
     <div ref={wrapperRef} className="relative w-full">
       <label
-        className={`flex items-center gap-2 font-semibold text-slate-700 mb-2 ${
-          isLarge ? "text-base" : "text-sm"
-        }`}
+        className={`flex items-center gap-2 font-semibold text-slate-700 ${
+          isCompact ? "mb-1.5" : "mb-2"
+        } ${isLarge ? "text-base" : "text-sm"}`}
       >
         <FaCalendarAlt className="text-blue-500" size={13} />
         {label}
@@ -76,7 +77,11 @@ function DateSelector({
         type="button"
         onClick={() => setIsOpen((currentValue) => !currentValue)}
         className={`w-full flex items-center justify-between px-4 border rounded-xl bg-white text-slate-800 outline-none transition-all ${
-          isLarge ? "py-3.5 text-base" : "py-2.5 text-sm"
+          isLarge
+            ? "py-3.5 text-base"
+            : isCompact
+              ? "py-2 text-sm"
+              : "py-2.5 text-sm"
         } ${
           isOpen
             ? "border-blue-500 ring-2 ring-blue-100"
