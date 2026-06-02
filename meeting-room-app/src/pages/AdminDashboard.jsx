@@ -469,6 +469,15 @@ function BookingsSection({
   );
 
   function startReschedule(booking) {
+    if (!canModifyBooking(booking)) {
+      showToast(
+        "error",
+        getBookingActionDisabledReason(booking) ||
+          "This booking cannot be rescheduled."
+      );
+      return;
+    }
+
     setEditingBookingId(booking.id);
     setEditData({
       newDate: booking.date,
@@ -478,6 +487,16 @@ function BookingsSection({
   }
 
   async function saveReschedule(booking) {
+    if (!canModifyBooking(booking)) {
+      showToast(
+        "error",
+        getBookingActionDisabledReason(booking) ||
+          "This booking cannot be rescheduled."
+      );
+      setEditingBookingId(null);
+      return;
+    }
+
     if (!editData.newDate || !editData.newStartTime || !editData.newEndTime) {
       showToast("error", "Please select date, start time, and end time.");
       return;
@@ -1910,6 +1929,61 @@ function StatusBadge({ status }) {
   );
 }
 
+function BookingStatusBadge({ booking }) {
+  const statusMeta = getBookingStatusMeta(booking);
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${statusMeta.className}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${statusMeta.dotClass}`} />
+      {statusMeta.label}
+    </span>
+  );
+}
+
+function getBookingStatusMeta(booking) {
+  const status = String(booking?.status || "confirmed").toLowerCase();
+
+  if (status === "checked-in" || status === "in-use" || status === "in use") {
+    return {
+      label: "In use",
+      className: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100",
+      dotClass: "bg-emerald-500 animate-pulse",
+    };
+  }
+
+  if (status === "pending") {
+    return {
+      label: "Pending",
+      className: "bg-amber-50 text-amber-700 ring-1 ring-amber-100",
+      dotClass: "bg-amber-500",
+    };
+  }
+
+  if (status === "cancelled" || status === "canceled") {
+    return {
+      label: "Cancelled",
+      className: "bg-red-50 text-red-700 ring-1 ring-red-100",
+      dotClass: "bg-red-500",
+    };
+  }
+
+  if (status === "completed" || isBookingOver(booking)) {
+    return {
+      label: "Completed",
+      className: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
+      dotClass: "bg-slate-400",
+    };
+  }
+
+  return {
+    label: "Confirmed",
+    className: "bg-green-50 text-green-700 ring-1 ring-green-100",
+    dotClass: "bg-green-500",
+  };
+}
+
 function ViewToggle({ viewMode, setViewMode }) {
   return (
     <div className="inline-flex rounded-xl bg-slate-100 p-1">
@@ -2002,6 +2076,9 @@ function BookingCard({
   onCancelBooking,
   onDeleteBooking,
 }) {
+  const canModify = canModifyBooking(booking);
+  const disabledReason = getBookingActionDisabledReason(booking);
+
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
@@ -2014,7 +2091,7 @@ function BookingCard({
           </p>
         </div>
 
-        <StatusBadge status="confirmed" />
+        <BookingStatusBadge booking={booking} />
       </div>
 
       <div className="mt-4 space-y-2 text-sm text-slate-600">
@@ -2093,7 +2170,13 @@ function BookingCard({
         </div>
       ) : (
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={onEdit} className="admin-action-blue">
+          <button
+            type="button"
+            onClick={onEdit}
+            disabled={!canModify}
+            title={disabledReason || "Reschedule booking"}
+            className="admin-action-blue disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-slate-100 disabled:active:scale-100"
+          >
             <FaEdit size={13} />
             Reschedule
           </button>
@@ -2101,7 +2184,9 @@ function BookingCard({
           <button
             type="button"
             onClick={onCancelBooking}
-            className="admin-action-red"
+            disabled={!canModify}
+            title={disabledReason || "Cancel booking"}
+            className="admin-action-red disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-slate-100 disabled:active:scale-100"
           >
             <FaTimesCircle size={13} />
             Cancel Booking
@@ -2135,11 +2220,12 @@ function BookingTable({
     <div>
       <table className="hidden w-full table-fixed text-sm lg:table">
         <colgroup>
-          <col className="w-[22%]" />
-          <col className="w-[21%]" />
+          <col className="w-[18%]" />
+          <col className="w-[17%]" />
+          <col className="w-[10%]" />
+          <col className="w-[16%]" />
           <col className="w-[12%]" />
-          <col className="w-[14%]" />
-          <col className="w-[31%]" />
+          <col className="w-[27%]" />
         </colgroup>
 
         <thead className="bg-slate-50/80 text-left text-xs uppercase tracking-wide text-slate-500">
@@ -2148,12 +2234,17 @@ function BookingTable({
             <th className="px-3 py-2.5 font-bold">User</th>
             <th className="px-3 py-2.5 font-bold">Date</th>
             <th className="px-3 py-2.5 font-bold">Time</th>
+            <th className="px-3 py-2.5 font-bold">Status</th>
             <th className="px-3 py-2.5 font-bold">Actions</th>
           </tr>
         </thead>
 
         <tbody className="divide-y divide-slate-100">
-          {bookings.map((booking) => (
+          {bookings.map((booking) => {
+            const canModify = canModifyBooking(booking);
+            const disabledReason = getBookingActionDisabledReason(booking);
+
+            return (
             <tr
               key={booking.id}
               className="group align-middle transition hover:bg-slate-50/80"
@@ -2185,10 +2276,17 @@ function BookingTable({
               </td>
 
               <td className="px-3 py-2.5">
-                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-slate-700">
-                  <FaClock size={11} className="text-blue-500" />
-                  {booking.slot}
+                <span
+                  className="inline-flex max-w-full min-w-0 items-center gap-1.5 whitespace-nowrap text-[13px] font-medium text-slate-700"
+                  title={booking.slot}
+                >
+                  <FaClock size={11} className="shrink-0 text-blue-500" />
+                  <span className="min-w-0 truncate">{booking.slot}</span>
                 </span>
+              </td>
+
+              <td className="px-3 py-2.5">
+                <BookingStatusBadge booking={booking} />
               </td>
 
               <td className="px-3 py-2.5">
@@ -2196,7 +2294,9 @@ function BookingTable({
                   <button
                     type="button"
                     onClick={() => startReschedule(booking)}
-                    className="admin-table-action-blue"
+                    disabled={!canModify}
+                    title={disabledReason || "Reschedule booking"}
+                    className="admin-table-action-blue disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-slate-100 disabled:active:scale-100"
                   >
                     <FaEdit size={13} />
                     Reschedule
@@ -2215,7 +2315,9 @@ function BookingTable({
                         payload: booking.id,
                       })
                     }
-                    className="admin-table-action-red"
+                    disabled={!canModify}
+                    title={disabledReason || "Cancel booking"}
+                    className="admin-table-action-red disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-slate-100 disabled:active:scale-100"
                   >
                     <FaTimesCircle size={13} />
                     Cancel
@@ -2307,12 +2409,17 @@ function BookingTable({
                 )}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
 
       <div className="space-y-3 p-3 lg:hidden">
-        {bookings.map((booking) => (
+        {bookings.map((booking) => {
+          const canModify = canModifyBooking(booking);
+          const disabledReason = getBookingActionDisabledReason(booking);
+
+          return (
           <article
             key={`booking-card-${booking.id}`}
             className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm"
@@ -2336,9 +2443,12 @@ function BookingTable({
                     </p>
                   </div>
 
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
-                    {booking.date}
-                  </span>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <BookingStatusBadge booking={booking} />
+                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                      {booking.date}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -2367,7 +2477,9 @@ function BookingTable({
                   <button
                     type="button"
                     onClick={() => startReschedule(booking)}
-                    className="admin-table-action-blue w-full"
+                    disabled={!canModify}
+                    title={disabledReason || "Reschedule booking"}
+                    className="admin-table-action-blue w-full disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-slate-100 disabled:active:scale-100"
                   >
                     <FaEdit size={13} />
                     Reschedule
@@ -2386,7 +2498,9 @@ function BookingTable({
                         payload: booking.id,
                       })
                     }
-                    className="admin-table-action-red w-full"
+                    disabled={!canModify}
+                    title={disabledReason || "Cancel booking"}
+                    className="admin-table-action-red w-full disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:hover:bg-slate-100 disabled:active:scale-100"
                   >
                     <FaTimesCircle size={13} />
                     Cancel
@@ -2477,7 +2591,8 @@ function BookingTable({
               </div>
             )}
           </article>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -2547,6 +2662,64 @@ function getEndFromSlot(slot) {
 
   const end = slot.split("-")[1].trim();
   return convertDisplayTimeTo24Hour(end);
+}
+
+function getBookingEndTime(booking) {
+  return (
+    booking?.endTime ||
+    getEndFromSlot(booking?.slot || "") ||
+    booking?.time?.split("-")[1]?.trim() ||
+    ""
+  );
+}
+
+function isBookingOver(booking) {
+  const endTime = getBookingEndTime(booking);
+
+  if (!booking?.date || !endTime) return false;
+
+  const bookingEnd = new Date(
+    `${booking.date}T${convertDisplayTimeTo24Hour(endTime)}`
+  );
+
+  if (Number.isNaN(bookingEnd.getTime())) return false;
+
+  return bookingEnd <= new Date();
+}
+
+function canModifyBooking(booking) {
+  const status = String(booking?.status || "").toLowerCase();
+
+  if (
+    status === "checked-in" ||
+    status === "in-use" ||
+    status === "in use" ||
+    status === "completed" ||
+    status === "cancelled" ||
+    status === "canceled"
+  ) {
+    return false;
+  }
+
+  return !isBookingOver(booking);
+}
+
+function getBookingActionDisabledReason(booking) {
+  const status = String(booking?.status || "").toLowerCase();
+
+  if (status === "checked-in" || status === "in-use" || status === "in use") {
+    return "This meeting is already in use after check-in.";
+  }
+
+  if (status === "cancelled" || status === "canceled") {
+    return "Cancelled bookings cannot be rescheduled or cancelled again.";
+  }
+
+  if (status === "completed" || isBookingOver(booking)) {
+    return "This meeting is over and cannot be rescheduled or cancelled.";
+  }
+
+  return "";
 }
 
 function convertDisplayTimeTo24Hour(displayTime) {
