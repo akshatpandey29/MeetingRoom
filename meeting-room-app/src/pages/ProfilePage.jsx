@@ -220,7 +220,7 @@ function ProfilePage() {
               <InfoRow icon={<FaEnvelope size={13} />} label="Email Address" value={user?.email || '—'} />
               <InfoRow icon={<FaShieldAlt size={13} />} label="Role" value={user?.role === 'admin' ? 'Administrator' : 'Team Member'} />
               <InfoRow icon={<FaCalendarAlt size={13} />} label="Member Since" value={memberSince} />
-              <InfoRow
+              {/* <InfoRow
                 icon={<FaCheckCircle size={13} />}
                 label="Account Status"
                 value={
@@ -229,7 +229,7 @@ function ProfilePage() {
                     Active
                   </span>
                 }
-              />
+              /> */}
             </div>
           </div>
 
@@ -480,7 +480,7 @@ function ProfilePage() {
                   {user?.role === 'admin' ? 'Administrator' : 'Team Member'}
                 </span>
               </div>
-              <div className="flex items-center justify-between py-3">
+              {/* <div className="flex items-center justify-between py-3">
                 <div>
                   <p className="text-sm font-semibold text-slate-700">Account Status</p>
                   <p className="text-xs text-slate-400 mt-0.5">Your account is active and in good standing</p>
@@ -489,7 +489,7 @@ function ProfilePage() {
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   Active
                 </span>
-              </div>
+              </div> */}
             </div>
           </div>
 

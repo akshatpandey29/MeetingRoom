@@ -59,14 +59,14 @@ function LeftPanel() {
         <div style={{ width:36, height:36, borderRadius:9, background:'#2563eb', display:'flex', alignItems:'center', justifyContent:'center' }}>
           <MdMeetingRoom size={20} color="#fff"/>
         </div>
-        <span style={{ color:'#fff', fontSize:16, fontWeight:700, letterSpacing:'-0.3px' }}>RoomBook</span>
+        <span style={{ color:'#fff', fontSize:23, fontWeight:700, letterSpacing:'-0.3px' }}>RoomBook</span>
       </div>
       <div style={{ position:'relative' }}>
-        <h1 style={{ color:'#fff', fontSize:26, fontWeight:700, lineHeight:1.3, margin:'0 0 14px', letterSpacing:'-0.5px' }}>
+        <h1 style={{ color:'#fff', fontSize:30, fontWeight:700, lineHeight:1.3, margin:'0 0 14px', letterSpacing:'-0.5px' }}>
           Smart meeting rooms,<br/>
           <span style={{ color:'#60a5fa' }}>zero conflicts.</span>
         </h1>
-        <p style={{ color:'#94a3b8', fontSize:13.5, lineHeight:1.75, margin:0 }}>Reserve the right room at the right time. Real-time availability, instant confirmation.</p>
+        <p style={{ color:'#94a3b8', fontSize:17.5, lineHeight:1.75, margin:0 }}>Reserve the right room at the right time. Real-time availability, instant confirmation.</p>
         <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:24 }}>
           {['Real-time availability','Conflict detection','Admin controls','Booking calendar'].map((f)=>(
             <span key={f} style={{ fontSize:11.5, fontWeight:500, color:'#cbd5e1', background:'#ffffff0d', border:'1px solid #ffffff15', borderRadius:20, padding:'5px 12px' }}>{f}</span>
@@ -76,7 +76,7 @@ function LeftPanel() {
       <div style={{ position:'relative', display:'flex', gap:36 }}>
         {[['0','Double bookings'],['Live','Availability'],['Instant','Confirmation']].map(([val,label])=>(
           <div key={label}>
-            <p style={{ color:'#fff', fontSize:18, fontWeight:700, margin:'0 0 3px' }}>{val}</p>
+            <p style={{ color:'#fff', fontSize:21, fontWeight:700, margin:'0 0 3px' }}>{val}</p>
             <p style={{ color:'#64748b', fontSize:11.5, margin:0 }}>{label}</p>
           </div>
         ))}
@@ -225,7 +225,7 @@ function LoginPage() {
       <div style={{ minHeight:'100vh', display:'flex', fontFamily:"'Inter', sans-serif" }}>
         <ToastContainer toasts={toasts}/>
 
-        <div className="login-left-panel" style={{ display:'none', width:'52%' }}>
+        <div className="login-left-panel" style={{ display:'none', width:'47%' }}>
           <LeftPanel/>
         </div>
 
