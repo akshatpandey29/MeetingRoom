@@ -15,8 +15,8 @@ const SCHEDULE_START_TIME = "00:00";
 const SCHEDULE_END_TIME = "24:00";
 const DEFAULT_EMPTY_SLOT_START = "09:00";
 const SCHEDULE_MODES = [
-  { key: "days", label: "Days" },
-  { key: "weeks", label: "Weeks" },
+  { key: "days", label: "Day" },
+  { key: "weeks", label: "Week" },
   { key: "month", label: "Month" },
 ];
 
@@ -193,7 +193,7 @@ function RoomScheduleBoard({
   }
 
   return (
-    <section className="room-schedule-board mb-4 rounded-2xl border border-gray-200 bg-white shadow-sm">
+    <section className="room-schedule-board mb-5 rounded-2xl border border-gray-200 bg-white shadow-sm">
       <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:px-5 sm:py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 sm:h-10 sm:w-10">
@@ -201,10 +201,10 @@ function RoomScheduleBoard({
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Room Calendar
+              Room Schedule
             </h2>
             <p className="mt-0.5 text-sm text-slate-500">
-              Blue bookings are yours. Gray bookings belong to other users.
+              Overview of room bookings for the selected date.
             </p>
           </div>
         </div>
@@ -580,7 +580,7 @@ function RoomScheduleBoard({
             width: var(--schedule-room-column);
             min-width: var(--schedule-room-column);
             max-width: var(--schedule-room-column);
-            z-index: 60;
+            z-index: 40;
             box-shadow: 1px 0 0 #e5e7eb;
           }
 

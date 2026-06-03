@@ -1312,6 +1312,7 @@ function RoomsSection({
     location: "",
     capacity: "",
     description: "",
+    imageUrl: "",
     amenities: "",
     status: "available",
     isActive: true,
@@ -1336,6 +1337,7 @@ function RoomsSection({
       location: room.location || "",
       capacity: room.capacity || "",
       description: room.description || "",
+      imageUrl: room.imageUrl || "",
       amenities: Array.isArray(room.amenities)
         ? room.amenities.join(", ")
         : room.amenities || "",
@@ -1367,6 +1369,7 @@ function RoomsSection({
     const formattedRoom = {
       ...roomForm,
       capacity: Number(roomForm.capacity),
+      imageUrl: roomForm.imageUrl?.trim() || "",
       amenities: roomForm.amenities
         .split(",")
         .map((amenity) => amenity.trim())
@@ -1525,6 +1528,23 @@ function RoomsSection({
                   placeholder="Best for client calls and team meetings"
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                 />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                  Room Image URL
+                </label>
+                <input
+                  type="url"
+                  name="imageUrl"
+                  value={roomForm.imageUrl}
+                  onChange={handleRoomFormChange}
+                  placeholder="https://example.com/meeting-room.jpg"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Optional. If left empty, RoomBook will use a professional fallback image.
+                </p>
               </div>
 
               <div className="md:col-span-2">

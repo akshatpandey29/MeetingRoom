@@ -39,6 +39,7 @@ function normalizeRoom(room) {
     capacity: room?.capacity || 0,
     description: room?.description || "",
     amenities: Array.isArray(room?.amenities) ? room.amenities : [],
+    imageUrl: room?.imageUrl || "",
     status: room?.status || "available",
     isActive: room?.isActive ?? true,
   };
@@ -278,6 +279,7 @@ export function RoomProvider({ children }) {
         location: roomData.location,
         capacity: Number(roomData.capacity),
         description: roomData.description || "",
+        imageUrl: roomData.imageUrl || "",
         amenities: Array.isArray(roomData.amenities)
           ? roomData.amenities
           : String(roomData.amenities || "").split(",").map((item) => item.trim()).filter(Boolean),
@@ -300,6 +302,7 @@ export function RoomProvider({ children }) {
         location: roomData.location,
         capacity: Number(roomData.capacity),
         description: roomData.description || "",
+        imageUrl: roomData.imageUrl || "",
         amenities: Array.isArray(roomData.amenities)
           ? roomData.amenities
           : String(roomData.amenities || "").split(",").map((item) => item.trim()).filter(Boolean),

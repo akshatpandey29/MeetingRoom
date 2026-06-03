@@ -650,14 +650,20 @@ function RoomsPage() {
   });
 
   return (
-    <section className="min-h-screen px-4 py-3 md:px-6 md:py-4 bg-slate-50">
-      <div className="mb-2 max-w-7xl mx-auto px-2 md:px-4 py-1">
-          <p className="text-lg font-bold text-blue-600 uppercase tracking-wide">
+    <section className="min-h-screen bg-slate-50 px-4 py-4 md:px-6">
+      <div className="mx-auto max-w-7xl">
+        <div className="mb-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600">
             Meeting Rooms
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-950 md:text-3xl">
+            Find and book the right room
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-500">
+            Check the schedule, choose a future slot, and continue with the room that fits.
           </p>
         </div>
 
-      <div className="max-w-7xl mx-auto">
         <RoomScheduleBoard
           rooms={activeRooms}
           bookings={bookings}
@@ -667,77 +673,70 @@ function RoomsPage() {
           fetchBookingsByRoomAndDate={fetchBookingsByRoomAndDate}
         />
 
-        <div className="mb-4 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-          <div className="grid grid-cols-1 lg:grid-cols-[0.78fr_1.62fr]">
-            <aside className="bg-slate-950 px-5 py-5 text-white md:px-6 lg:min-h-[360px]">
+        <div className="mb-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid lg:grid-cols-[0.9fr_1.55fr]">
+          <div className="bg-slate-950 px-5 py-6 text-white sm:px-7 lg:px-8 lg:py-7">
+            <h2 className="text-2xl font-bold tracking-tight">
+              Find a Room
+            </h2>
+            <p className="mt-3 max-w-xl text-sm leading-6 text-slate-300">
+              Select a future slot first. RoomBook will show matching rooms with
+              clear availability before you move to the booking page.
+            </p>
 
-              <h1 className="mt-1 max-w-sm text-2xl font-bold">
-                Find a Room
-              </h1>
+            <div className="mt-6 space-y-5">
+              <GuideStep
+                number="1"
+                title="Choose the meeting time"
+                description="Date, start time, and end time are required to check availability."
+              />
+              <GuideStep
+                number="2"
+                title="Refine the room match"
+                description="Use capacity, floor, or amenities when you need a specific setup."
+              />
+              <GuideStep
+                number="3"
+                title="Continue with the right action"
+                description="Available rooms can be booked. Booked slots can be sent for admin approval."
+              />
+            </div>
 
-              <p className="mt-2 max-w-md text-sm leading-5 text-slate-300">
-                Select a future slot first. RoomBook will show matching rooms with
-                clear availability before you move to the booking page.
+            <div className="mt-7 border-t border-white/10 pt-5">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+                Selected Slot
               </p>
+              <p className="mt-2 text-lg font-bold text-white">
+                {selectedSlotText || "No time selected yet"}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">
+                Fields marked with a red dot are required before rooms can be shown.
+              </p>
+            </div>
+          </div>
 
-              <div className="mt-5 space-y-3">
-                <GuideStep
-                  number="1"
-                  title="Choose the meeting time"
-                  description="Date, start time, and end time are required to check availability."
-                />
-                <GuideStep
-                  number="2"
-                  title="Refine the room match"
-                  description="Use capacity, floor, or amenities when you need a specific setup."
-                />
-                <GuideStep
-                  number="3"
-                  title="Continue with the right action"
-                  description="Available rooms can be booked. Booked slots can be sent for admin approval."
-                />
-              </div>
-
-              <div className="mt-5 border-t border-white/10 pt-4">
-                <p className="text-xs font-semibold uppercase text-slate-400">
-                  Selected slot
-                </p>
-                <p className="mt-1.5 text-base font-bold text-white">
-                  {selectedSlotText || "No time selected yet"}
-                </p>
-                <p className="mt-1.5 text-xs leading-5 text-slate-400">
-                  Fields marked with a red dot are required before rooms can be shown.
-                </p>
-              </div>
-            </aside>
-
-            <div className="px-4 py-4 sm:px-5 sm:py-5 xl:px-6 xl:py-5">
-              <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-                    <FaCalendarAlt size={16} />
-                  </div>
-
-                  <div>
-                    <h2 className="text-lg font-bold leading-tight text-slate-900">
-                      Room Availability
-                    </h2>
-                    <p className="mt-0.5 text-xs text-slate-500">
-                      Complete the required fields, then show matching rooms.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-bold text-slate-700">
-                  <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]" />
-                  Required fields
-                  <span className="font-semibold text-slate-500">
-                    marked in red
-                  </span>
+          <div className="bg-white px-4 py-4 sm:px-6 sm:py-5 lg:px-7">
+            <div className="mb-4 flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  <FaCalendarAlt size={17} />
+                </span>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-950">
+                    Room Availability
+                  </h2>
+                  <p className="mt-0.5 text-sm text-slate-500">
+                    Complete the required fields, then show matching rooms.
+                  </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <span className="inline-flex w-fit items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-bold text-slate-700">
+                <span className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_0_4px_rgba(239,68,68,0.12)]" />
+                Required fields
+              </span>
+            </div>
+
+              <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <DateSelector
                   value={selectedDate}
                   onChange={handleDateChange}
@@ -782,7 +781,7 @@ function RoomsPage() {
                   />
                 </CompactField>
 
-                <div className="xl:col-span-3 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 shadow-sm">
+                <div className="xl:col-span-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-sm font-bold text-slate-950">
@@ -790,7 +789,7 @@ function RoomsPage() {
                       </p>
 
                       <p className="mt-0.5 text-xs text-slate-500">
-                        Choose a common duration.
+                        Choose a common duration from the selected start time.
                       </p>
                     </div>
 
@@ -814,10 +813,10 @@ function RoomsPage() {
                           disabled={slot.disabled}
                           className={`rounded-xl border px-3 py-2.5 text-left transition ${
                             slot.disabled
-                              ? "cursor-not-allowed border-slate-100 bg-white/60 text-slate-400"
+                              ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400"
                               : isSelectedRecommendedSlot
                                 ? "border-blue-600 bg-blue-50 shadow-sm"
-                                : "border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-white hover:shadow-sm"
+                                : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50 hover:shadow-sm"
                           }`}
                         >
                           <span
@@ -858,7 +857,7 @@ function RoomsPage() {
                   <select
                     value={floorFilter}
                     onChange={(event) => handleFloorChange(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   >
                     <option value="">Any floor</option>
                     {floorOptions.map((floor) => (
@@ -882,7 +881,7 @@ function RoomsPage() {
                         type="button"
                         onClick={() => handleCapacityChange(option)}
                         disabled={!option.isAvailable}
-                        className={`min-h-10 rounded-xl border px-3 py-2 text-sm font-bold transition-all ${
+                        className={`min-h-11 rounded-xl border px-3 py-2 text-sm font-bold transition-all ${
                           capacityKey === option.key
                             ? "border-blue-700 bg-blue-50 text-blue-900 shadow-sm"
                             : !option.isAvailable
@@ -906,7 +905,7 @@ function RoomsPage() {
                     placeholder="Projector, whiteboard, room name..."
                     value={searchText}
                     onChange={(event) => setSearchText(event.target.value)}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
                 </CompactField>
               </div>
@@ -920,12 +919,19 @@ function RoomsPage() {
                 </p>
               )}
 
-              <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
+              <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="min-h-11 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Clear
+                </button>
                 <button
                   type="button"
                   onClick={handleShowRooms}
                   disabled={!canShowAvailableRooms}
-                  className={`min-h-10 flex-1 rounded-xl px-5 py-2.5 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
+                  className={`min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 sm:min-w-64 ${
                     canShowAvailableRooms
                       ? "bg-blue-700 text-white hover:bg-blue-800"
                       : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
@@ -933,15 +939,7 @@ function RoomsPage() {
                 >
                   Show Available Rooms
                 </button>
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="min-h-10 rounded-xl px-5 py-2.5 text-sm font-bold border-2 border-blue-400 text-slate-600 transition hover:bg-slate-100"
-                >
-                  Clear
-                </button>
               </div>
-            </div>
           </div>
         </div>
 
@@ -949,16 +947,21 @@ function RoomsPage() {
           <>
             <div
               ref={resultsRef}
-              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3 scroll-mt-24"
+              className="mb-4 flex flex-col gap-3 scroll-mt-24 sm:flex-row sm:items-center sm:justify-between"
             >
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Rooms for Selected Slot
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    Available Rooms
+                  </h2>
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
+                    {filteredRooms.length}
+                  </span>
+                </div>
 
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Showing {filteredRooms.length} room
-                  {filteredRooms.length !== 1 ? "s" : ""} for {selectedSlotText}
+                <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  Rooms available for {selectedSlotText}
                 </p>
               </div>
 
@@ -996,7 +999,7 @@ function RoomsPage() {
                 key={viewMode}
                 className={`transition-all duration-300 ease-out animate-[fadeSlide_0.28s_ease-out] ${
                   viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
+                    ? "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
                     : "space-y-2.5"
                 }`}
               >
@@ -1017,6 +1020,7 @@ function RoomsPage() {
                       nextAvailableSlot={room.nextAvailableSlot}
                       isAvailableForSelectedTime={room.isAvailableForSelectedTime}
                       slotStatus={room.slotStatus}
+                      imageIndex={index}
                     />
                   </div>
                 ))}
@@ -1032,6 +1036,30 @@ function RoomsPage() {
                 </p>
               </div>
             )}
+
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-bold text-white">
+                  i
+                </span>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Can't find what you need?
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Try adjusting your filters or check the schedule for a different time.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="rounded-xl border border-blue-100 bg-white px-4 py-2 text-xs font-bold text-blue-700 shadow-sm transition hover:bg-blue-50"
+              >
+                View Full Calendar
+              </button>
+            </div>
           </>
         )}
       </div>
@@ -1070,12 +1098,12 @@ function CompactField({ icon, label, required = false, className = "", children 
 function GuideStep({ number, title, description }) {
   return (
     <div className="flex gap-3">
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500 text-sm font-bold text-white">
         {number}
-      </div>
+      </span>
       <div>
-        <p className="text-sm font-semibold text-white">{title}</p>
-        <p className="mt-0.5 text-xs leading-5 text-slate-400">{description}</p>
+        <p className="text-sm font-bold text-white">{title}</p>
+        <p className="mt-1 text-sm leading-6 text-slate-400">{description}</p>
       </div>
     </div>
   );
