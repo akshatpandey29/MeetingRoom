@@ -13,8 +13,12 @@ import BookingModal from '../components/BookingModal';
 import api from '../services/api';
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function getTodayDate() {
-  return new Date().toISOString().split('T')[0];
+function getTodayDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
 }
 
 function formatDisplayDate(dateStr) {
@@ -343,7 +347,7 @@ function MyBookingsPage() {
   const activeCount = upcomingBookings.filter(b => b.status === 'checked-in').length;
   const now = new Date();
   const weekEnd = new Date(); weekEnd.setDate(now.getDate() + 7);
-  const weekEndStr = weekEnd.toISOString().split('T')[0];
+  const weekEndStr = getTodayDate(weekEnd);
   const thisWeekCount = upcomingBookings.filter(b => b.date >= getTodayDate() && b.date <= weekEndStr).length;
 
   // ── handlers ──────────────────────────────────────────────────────────────

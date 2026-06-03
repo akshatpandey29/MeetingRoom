@@ -594,6 +594,26 @@ const approveAdminRequest = async ({ requestId, adminNote = "" }) => {
     return { success: false, statusCode: 404, message: "Request not found." };
   }
 
+  if (request.status !== ADMIN_REQUEST_STATUS.PENDING) {
+    return {
+      success: false,
+      statusCode: 400,
+      message: "Only pending requests can be approved.",
+    };
+  }
+
+  const bookingResult = await createBooking({
+    userId: request.userId?._id || request.userId,
+    roomId: request.roomId?._id || request.roomId,
+    date: request.date,
+    startTime: request.startTime,
+    endTime: request.endTime,
+  });
+
+  if (!bookingResult.success) {
+    return bookingResult;
+  }
+
   request.status = ADMIN_REQUEST_STATUS.APPROVED;
   request.adminNote = adminNote;
   request.reviewedAt = new Date();
@@ -617,8 +637,8 @@ const approveAdminRequest = async ({ requestId, adminNote = "" }) => {
 
   return {
     success: true,
-    message: "Request approved.",
-    data: { request },
+    message: "Request approved and booking created successfully.",
+    data: { request, booking: bookingResult.data.booking },
   };
 };
 

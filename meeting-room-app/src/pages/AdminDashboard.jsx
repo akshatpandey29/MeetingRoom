@@ -46,6 +46,7 @@ function AdminDashboard() {
     deleteRoom,
     toggleRoomActive,
     updateAdminRequest,
+    clearReviewedAdminRequests,
   } = useRooms();
 
   const { users, normalUsers, changeUserRole, toggleUserStatus } = useAuth();
@@ -184,27 +185,18 @@ function AdminDashboard() {
         return;
       }
 
-      const requestStartTime = payload.startTime || getStartFromSlot(payload.slot);
-      const requestEndTime = payload.endTime || getEndFromSlot(payload.slot);
-
-      const conflict = hasBookingConflict({
-        bookings,
-        roomId: payload.roomId,
-        date: payload.date,
-        startTime: requestStartTime,
-        endTime: requestEndTime,
-      });
-
-      if (conflict) {
-        showToast("error", "This request conflicts with an existing booking.");
-        closeModal();
-        return;
-      }
-
       const result = await updateAdminRequest(payload.id, "approved");
       showToast(
         result.success ? "success" : "error",
         result.message || "Request approved and booking created successfully."
+      );
+    }
+
+    if (type === "clearReviewedRequests") {
+      const result = await clearReviewedAdminRequests();
+      showToast(
+        result.success ? "success" : "error",
+        result.message || "Reviewed requests cleared successfully."
       );
     }
 
@@ -1067,22 +1059,6 @@ function RequestsSection({
       return;
     }
 
-    const conflict = hasBookingConflict({
-      bookings,
-      roomId: request.roomId,
-      date: request.date,
-      startTime: requestStartTime,
-      endTime: requestEndTime,
-    });
-
-    if (conflict) {
-      showToast(
-        "error",
-        "This request conflicts with an existing booking. Ask the user to choose another time."
-      );
-      return;
-    }
-
     openModal({
       type: "approveRequest",
       title: "Approve Booking Request",
@@ -1155,16 +1131,39 @@ function RequestsSection({
             </p>
           </div>
 
-          <select
-            value={requestFilter}
-            onChange={(event) => setRequestFilter(event.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            <option value="all">All Requests</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            {approvedRequests + rejectedRequests > 0 && (
+              <button
+                type="button"
+                onClick={() =>
+                  openModal({
+                    type: "clearReviewedRequests",
+                    title: "Clear Reviewed Requests",
+                    message:
+                      "Clear all approved and rejected requests? Pending requests will stay in the list.",
+                    confirmText: "Clear Reviewed",
+                    tone: "red",
+                    payload: null,
+                  })
+                }
+                className="inline-flex h-10 items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+              >
+                <FaTrash size={13} />
+                Clear Reviewed
+              </button>
+            )}
+
+            <select
+              value={requestFilter}
+              onChange={(event) => setRequestFilter(event.target.value)}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="all">All Requests</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
         </div>
 
         <div className="p-4">
@@ -1239,9 +1238,10 @@ function RequestsSection({
                         </div>
 
                         {request.status === "pending" && hasConflict && (
-                          <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
-                            Conflict found: this room is already booked during
-                            this time.
+                          <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-700">
+                            Possible conflict in the current list. Approval
+                            will re-check live booking data before creating the
+                            booking.
                           </p>
                         )}
 
@@ -1257,9 +1257,9 @@ function RequestsSection({
                           <button
                             type="button"
                             onClick={() => handleApproveRequest(request)}
-                            disabled={hasConflict || isRoomUnavailable}
+                            disabled={isRoomUnavailable}
                             className={`admin-action-green ${
-                              hasConflict || isRoomUnavailable
+                              isRoomUnavailable
                                 ? "cursor-not-allowed opacity-50"
                                 : ""
                             }`}
@@ -1575,7 +1575,7 @@ function RoomsSection({
                 type="submit"
                 className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
-                {editingRoom ? "Update Room" : "Save Room"}
+                {editingRoom ? "Update Room" : "Add Room"}
               </button>
             </div>
           </form>
@@ -2797,6 +2797,12 @@ function hasBookingConflict({
     }
 
     if (booking.date !== date) {
+      return false;
+    }
+
+    const status = String(booking.status || "confirmed").toLowerCase();
+
+    if (!["confirmed", "checked-in"].includes(status)) {
       return false;
     }
 

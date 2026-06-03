@@ -142,12 +142,25 @@ function RoomCard({
                 <p className="font-medium text-slate-700">
                   {resolvedSlotStatus.label}
                 </p>
-                <p className="text-[11px] text-slate-500">
-                  {selectedTimeText}
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  Next: {resolvedSlotStatus.nextAvailableSlot || nextAvailableSlot}
-                </p>
+                {resolvedSlotStatus.type === "user-conflict" ? (
+                  <>
+                    <p className="text-[11px] font-semibold text-amber-700">
+                      {resolvedSlotStatus.helper}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      {resolvedSlotStatus.conflictDetail}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[11px] text-slate-500">
+                      {selectedTimeText}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      Next: {resolvedSlotStatus.nextAvailableSlot || nextAvailableSlot}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -272,28 +285,45 @@ function RoomCard({
           )}
         </div>
 
-        <div
-          className={`${getAvailabilityPanelClass(
-            resolvedSlotStatus.type
-          )} border rounded-lg p-2.5 mb-2.5`}
-        >
-          <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-1">
-            <FaClock size={11} className="text-blue-500" />
-            <span className="font-semibold">{resolvedSlotStatus.label}</span>
+        {resolvedSlotStatus.type === "user-conflict" ? (
+          <div className="mb-2.5 rounded-lg border border-amber-200 bg-amber-50 p-2.5 shadow-[inset_3px_0_0_#f59e0b]">
+            <div className="mb-1 flex items-center gap-1.5 text-xs text-amber-800">
+              <FaBell size={11} className="text-amber-600" />
+              <span className="font-bold">{resolvedSlotStatus.label}</span>
+            </div>
+
+            <p className="text-[11px] font-semibold text-amber-900">
+              {resolvedSlotStatus.helper}
+            </p>
+
+            <p className="mt-1 text-[11px] leading-4 text-amber-800">
+              {resolvedSlotStatus.conflictDetail}
+            </p>
           </div>
+        ) : (
+          <div
+            className={`${getAvailabilityPanelClass(
+              resolvedSlotStatus.type
+            )} border rounded-lg p-2.5 mb-2.5`}
+          >
+            <div className="flex items-center gap-1.5 text-xs text-slate-700 mb-1">
+              <FaClock size={11} className="text-blue-500" />
+              <span className="font-semibold">{resolvedSlotStatus.label}</span>
+            </div>
 
-          <p className="text-xs font-medium text-slate-700">
-            {selectedTimeText}
-          </p>
+            <p className="text-xs font-medium text-slate-700">
+              {selectedTimeText}
+            </p>
 
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            {resolvedSlotStatus.helper}
-          </p>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              {resolvedSlotStatus.helper}
+            </p>
 
-          <p className="text-[11px] text-slate-400 mt-1">
-            Next free: {resolvedSlotStatus.nextAvailableSlot || nextAvailableSlot}
-          </p>
-        </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Next free: {resolvedSlotStatus.nextAvailableSlot || nextAvailableSlot}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <Link
@@ -377,6 +407,7 @@ function getAvailabilityPanelClass(status) {
     free: "bg-green-50 border-green-100",
     booked: "bg-red-50 border-red-100",
     "booked-by-you": "bg-blue-50 border-blue-100",
+    "user-conflict": "bg-amber-50 border-amber-200",
     invalid: "bg-amber-50 border-amber-100",
     unavailable: "bg-slate-50 border-slate-100",
     "needs-time": "bg-blue-50 border-blue-100",
@@ -389,6 +420,7 @@ function getBookButtonLabel(status) {
   const labels = {
     booked: "Booked",
     "booked-by-you": "Booked by you",
+    "user-conflict": "Cannot book",
     invalid: "Fix Time",
     unavailable: "Unavailable",
     "needs-time": "Pick Time",
@@ -410,6 +442,10 @@ function StatusBadge({ status }) {
     "booked-by-you": {
       label: "Booked by you",
       className: "bg-blue-50 text-blue-700",
+    },
+    "user-conflict": {
+      label: "Cannot book",
+      className: "bg-amber-50 text-amber-700",
     },
     invalid: {
       label: "Check time",
