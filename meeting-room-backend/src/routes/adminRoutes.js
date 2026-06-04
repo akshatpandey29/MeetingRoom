@@ -31,6 +31,13 @@ router.patch("/users/:id/status", adminController.toggleUserStatus);
 // GET /api/admin/booking-requests
 router.get("/booking-requests", adminController.getBookingRequests);
 
+// Clear reviewed booking requests
+// DELETE /api/admin/booking-requests/reviewed
+router.delete(
+  "/booking-requests/reviewed",
+  adminController.clearReviewedBookingRequests
+);
+
 // Approve booking request
 // PATCH /api/admin/booking-requests/:id/approve
 router.patch(

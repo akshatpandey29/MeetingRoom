@@ -510,6 +510,22 @@ export function RoomProvider({ children }) {
     }
   };
 
+  const clearReviewedAdminRequests = async () => {
+    try {
+      const response = await api.delete("/admin/booking-requests/reviewed");
+      setAdminRequests((previousRequests) =>
+        previousRequests.filter((request) => request.status === "pending")
+      );
+      return {
+        success: true,
+        message: response?.data?.message || "Reviewed booking requests cleared successfully.",
+        data: response?.data?.data || {},
+      };
+    } catch (error) {
+      return { success: false, message: getErrorMessage(error, "Reviewed booking requests could not be cleared.") };
+    }
+  };
+
   const addAdminRequest = async ({ roomId, date, startTime, endTime, purpose = "" }) => {
     try {
       const response = await api.post("/bookings/requests", { roomId, date, startTime, endTime, purpose });
@@ -567,6 +583,7 @@ export function RoomProvider({ children }) {
         updateAdminRequest,
         approveAdminRequest,
         rejectAdminRequest,
+        clearReviewedAdminRequests,
       }}
     >
       {children}

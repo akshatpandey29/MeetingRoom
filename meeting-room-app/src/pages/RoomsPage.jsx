@@ -234,6 +234,33 @@ function RoomsPage() {
     }) || null;
   }
 
+  function getUserConflictingBooking(start = startTime, end = endTime) {
+    if (!selectedDate || !start || !end) return null;
+
+    const newStart = convertTimeToMinutes(start);
+    const newEnd = convertTimeToMinutes(end);
+
+    return bookings.find((booking) => {
+      if (
+        booking.date !== selectedDate ||
+        !isActiveBooking(booking) ||
+        !isCurrentUserBooking(booking)
+      ) {
+        return false;
+      }
+
+      const existingStart = getBookingStartTime(booking);
+      const existingEnd = getBookingEndTime(booking);
+
+      if (!existingStart || !existingEnd) return false;
+
+      const bookedStart = convertTimeToMinutes(existingStart);
+      const bookedEnd = convertTimeToMinutes(existingEnd);
+
+      return newStart < bookedEnd && newEnd > bookedStart;
+    }) || null;
+  }
+
   function getNextAvailableSlot(roomId) {
     if (
       startTime &&
@@ -322,21 +349,62 @@ function RoomsPage() {
     }
 
     const conflictingBooking = getConflictingBooking(room.id);
+    const bookedByCurrentUser =
+      conflictingBooking && isCurrentUserBooking(conflictingBooking);
 
-    if (conflictingBooking) {
+    if (bookedByCurrentUser) {
       const conflictStart = getBookingStartTime(conflictingBooking);
       const conflictEnd = getBookingEndTime(conflictingBooking);
-      const bookedByCurrentUser = isCurrentUserBooking(conflictingBooking);
       const conflictSlot =
         conflictingBooking.slot ||
         `${formatTime(conflictStart)} - ${formatTime(conflictEnd)}`;
 
       return {
-        type: bookedByCurrentUser ? "booked-by-you" : "booked",
-        label: bookedByCurrentUser ? "Booked by you" : "Booked",
-        helper: bookedByCurrentUser
-          ? `You already booked this slot: ${conflictSlot}.`
-          : `Booked: ${conflictSlot}. Send an admin request if this time is important.`,
+        type: "booked-by-you",
+        label: "Booked by you",
+        helper: `You already booked this slot: ${conflictSlot}.`,
+        selectedSlotText,
+        nextAvailableSlot,
+        canBook: false,
+      };
+    }
+
+    const userConflictingBooking = getUserConflictingBooking();
+
+    if (userConflictingBooking) {
+      const conflictStart = getBookingStartTime(userConflictingBooking);
+      const conflictEnd = getBookingEndTime(userConflictingBooking);
+      const conflictRoom = activeRooms.find(
+        (candidateRoom) =>
+          String(candidateRoom.id) === String(userConflictingBooking.roomId)
+      );
+      const conflictRoomName = conflictRoom?.name || "Another room";
+      const conflictSlot =
+        userConflictingBooking.slot ||
+        `${formatTime(conflictStart)} - ${formatTime(conflictEnd)}`;
+
+      return {
+        type: "user-conflict",
+        label: "Cannot book",
+        helper: "You already have a booking during this time.",
+        conflictDetail: `${conflictRoomName} is booked from ${conflictSlot}. Cancel or reschedule it from My Bookings to book another room.`,
+        selectedSlotText,
+        nextAvailableSlot,
+        canBook: false,
+      };
+    }
+
+    if (conflictingBooking) {
+      const conflictStart = getBookingStartTime(conflictingBooking);
+      const conflictEnd = getBookingEndTime(conflictingBooking);
+      const conflictSlot =
+        conflictingBooking.slot ||
+        `${formatTime(conflictStart)} - ${formatTime(conflictEnd)}`;
+
+      return {
+        type: "booked",
+        label: "Booked",
+        helper: `Booked: ${conflictSlot}. Send an admin request if this time is important.`,
         selectedSlotText,
         nextAvailableSlot,
         canBook: false,
@@ -370,6 +438,7 @@ function RoomsPage() {
     if (slot.disabled) return;
 
     setSelectedDate(slot.date);
+    setScheduleDate(slot.date);
     setStartTime(slot.start);
     setEndTime(slot.end);
     setFormErrorMessage("");
@@ -384,6 +453,7 @@ function RoomsPage() {
       convertTimeToMinutes(startTime) < convertTimeToMinutes(minimumTime);
 
     setSelectedDate(date);
+    setScheduleDate(date);
     setFormErrorMessage("");
     setHasSubmittedAvailability(false);
 
@@ -393,9 +463,14 @@ function RoomsPage() {
     }
   }
 
+  function handleScheduleDateChange(date) {
+    handleDateChange(date);
+  }
+
   function clearFilters() {
     setSearchText("");
     setSelectedDate(getTodayDate());
+    setScheduleDate(getTodayDate());
     setStartTime(getCurrentRoundedTime());
     setEndTime("");
     setCapacityKey("");
@@ -669,7 +744,7 @@ function RoomsPage() {
           bookings={bookings}
           currentUser={user}
           selectedDate={scheduleDate}
-          onDateChange={setScheduleDate}
+          onDateChange={handleScheduleDateChange}
           fetchBookingsByRoomAndDate={fetchBookingsByRoomAndDate}
         />
 
@@ -919,25 +994,25 @@ function RoomsPage() {
                 </p>
               )}
 
-              <div className="mt-4 flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-end">
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="min-h-11 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Clear
-                </button>
+              <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
                 <button
                   type="button"
                   onClick={handleShowRooms}
                   disabled={!canShowAvailableRooms}
-                  className={`min-h-11 rounded-xl px-6 py-2.5 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 sm:min-w-64 ${
+                  className={`min-h-12 flex-1 rounded-xl px-6 py-3 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-4 focus:ring-blue-100 ${
                     canShowAvailableRooms
                       ? "bg-blue-700 text-white hover:bg-blue-800"
-                      : "cursor-not-allowed bg-slate-200 text-slate-400 shadow-none"
+                      : "cursor-not-allowed bg-slate-200/80 text-slate-400 shadow-none"
                   }`}
                 >
                   Show Available Rooms
+                </button>
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="min-h-12 rounded-xl border-2 border-blue-500 bg-white px-7 py-3 text-sm font-bold text-slate-700 transition hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-100 sm:min-w-28"
+                >
+                  Clear
                 </button>
               </div>
           </div>
