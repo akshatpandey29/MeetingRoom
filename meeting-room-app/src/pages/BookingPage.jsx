@@ -17,15 +17,6 @@ import BookingModal from "../components/BookingModal";
 import ConfirmModal from "../components/ConfirmModal";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-function formatDate(date) {
-  if (!date) return "";
-  if (typeof date === "string") return date;
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
 function formatDateLabel(dateStr) {
   if (!dateStr) return "";
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
@@ -194,7 +185,6 @@ function BookingPage() {
   }
 
   const allRoomBookings = getBookingsByRoom(selectedRoom.id).filter(b => b.status !== 'completed' && b.status !== 'cancelled');
-  const bookedSlotsForDate = getBookingsByRoomAndDate(selectedRoom.id, selectedDate);
   const duration = getDuration(startTime, endTime);
   const canBook = selectedDate && startTime && endTime && !editing;
 
