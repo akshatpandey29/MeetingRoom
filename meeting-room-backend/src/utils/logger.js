@@ -18,14 +18,15 @@ const logger = winston.createLogger({
         })
       ),
     }),
-    new winston.transports.File({
-      filename: 'logs/error.log',
-      level: 'error',
-    }),
-    new winston.transports.File({
-      filename: 'logs/combined.log',
-    }),
   ],
 });
+
+// Only add file transports in development
+if (process.env.NODE_ENV !== 'production') {
+  const fs = require('fs');
+  if (!fs.existsSync('logs')) fs.mkdirSync('logs');
+  logger.add(new winston.transports.File({ filename: 'logs/error.log', level: 'error' }));
+  logger.add(new winston.transports.File({ filename: 'logs/combined.log' }));
+}
 
 module.exports = logger;
