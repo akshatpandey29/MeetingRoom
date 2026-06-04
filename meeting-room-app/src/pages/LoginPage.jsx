@@ -126,7 +126,7 @@ function LoginPage() {
   const [activeTab, setActiveTab] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [, setGoogleLoading] = useState(false);
   const [loginData, setLoginData] = useState({ email:'', password:'' });
   const [loginErrors, setLoginErrors] = useState({});
   const [regData, setRegData] = useState({ name:'', email:'', password:'' });
