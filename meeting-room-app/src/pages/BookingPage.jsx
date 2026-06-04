@@ -91,7 +91,7 @@ function TimeSelector({ value, onChange, disabled, placeholder, startAfter }) {
   }).filter(Boolean).filter(t => !startAfter || t.val > startAfter);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }}>
+    <div ref={containerRef} className="relative w-full min-w-0">
       <button
         type="button"
         disabled={disabled}
@@ -104,19 +104,19 @@ function TimeSelector({ value, onChange, disabled, placeholder, startAfter }) {
             : 'bg-white text-slate-400 border-gray-200 hover:border-blue-300'
         }`}
       >
-        <span>{value ? (times.find(t => t.val === value)?.label || formatTime(value)) : placeholder}</span>
+        <span className="min-w-0 truncate">{value ? (times.find(t => t.val === value)?.label || formatTime(value)) : placeholder}</span>
         <svg className={`w-4 h-4 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${disabled ? 'text-slate-300' : 'text-slate-400'}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
       {open && (
-        <div style={{ position:'absolute', top:'100%', left:0, right:0, marginTop:4, background:'#fff', borderRadius:10, boxShadow:'0 4px 24px rgba(0,0,0,0.12)', border:'1px solid #e2e8f0', zIndex:9999, overflow:'hidden' }}>
-          <div style={{ maxHeight:200, overflowY:'auto' }}>
+        <div className="absolute left-0 right-0 top-full z-[90] mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+          <div className="overscroll-contain py-1" style={{ maxHeight: "min(22rem, calc(100vh - 12rem))", overflowY: "auto" }}>
             {times.map(({ label, val }) => (
               <button key={val} type="button"
                 onMouseDown={(e) => { e.preventDefault(); onChange(val); setOpen(false); }}
-                style={{ display:'block', width:'100%', textAlign:'left', padding:'9px 14px', fontSize:13,
+                style={{ display:'block', width:'100%', textAlign:'left', padding:'10px 14px', fontSize:13,
                   background: value === val ? '#0f172a' : 'transparent',
                   color: value === val ? '#fff' : '#334155',
                   fontWeight: value === val ? 500 : 400, border:'none', cursor:'pointer' }}
@@ -425,10 +425,10 @@ function BookingPage() {
           <div className="lg:col-span-2 space-y-4">
 
             {/* Booking Summary */}
-<div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+<div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-visible">
 
   {/* Dark header */}
-  <div className="bg-slate-900 px-5 py-4 flex items-center justify-between">
+  <div className="bg-slate-900 px-5 py-4 flex items-center justify-between rounded-t-2xl">
     <div className="flex items-center gap-3">
       <div className="w-9 h-9 bg-white bg-opacity-10 rounded-xl flex items-center justify-center">
         <FaCalendarAlt size={15} className="text-white" />
@@ -526,7 +526,7 @@ function BookingPage() {
             className="w-full bg-white text-slate-900 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 cursor-pointer font-medium"
           />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="text-xs font-semibold text-slate-500 block mb-1.5">Start Time</label>
             <TimeSelector value={startTime} onChange={(val) => { setStartTime(val); setEndTime(''); setMessage({text:'',type:''}); setConflict(false); }} placeholder="Select start" />

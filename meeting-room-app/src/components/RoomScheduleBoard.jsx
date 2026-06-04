@@ -466,12 +466,12 @@ function RoomScheduleBoard({
                   {roomBookings.map((booking) => {
                     const isMine = isCurrentUserBooking(booking, currentUser);
                     const canOpenBooking = isMine && !isPastBooking(booking);
-                    const gridColumn = getBookingGridColumn(
+                    const eventPosition = getBookingEventPosition(
                       booking,
                       timeSlots
                     );
 
-                    if (!gridColumn) return null;
+                    if (!eventPosition) return null;
 
                     return (
                       <button
@@ -483,14 +483,19 @@ function RoomScheduleBoard({
                           }
                         }}
                         aria-disabled={!canOpenBooking}
-                        className={`room-calendar-event z-10 m-1.5 self-center overflow-hidden rounded-xl px-2.5 py-1.5 text-left text-white shadow-sm transition ${
+                        className={`room-calendar-event absolute z-10 box-border overflow-hidden rounded-xl border border-white/70 px-2.5 py-1.5 text-left text-white shadow-sm transition ${
                           isMine ? "bg-blue-600" : "bg-slate-500"
                         } ${
                           canOpenBooking
                             ? "cursor-pointer hover:brightness-95"
                             : "cursor-default"
                         }`}
-                        style={{ gridColumn, gridRow: 1 }}
+                        style={{
+                          left: `${eventPosition.left}%`,
+                          width: `${eventPosition.width}%`,
+                          top: "0.375rem",
+                          bottom: "0.375rem",
+                        }}
                         title={
                           canOpenBooking
                             ? "Open in My Bookings"
@@ -589,8 +594,6 @@ function RoomScheduleBoard({
           }
 
           .room-calendar-event {
-            height: calc(100% - 0.75rem);
-            max-height: 4.75rem;
             min-width: 0;
             display: flex;
             flex-direction: column;
@@ -645,10 +648,6 @@ function RoomScheduleBoard({
             }
 
             .room-calendar-event {
-              height: calc(100% - 0.5rem);
-              max-height: 3.75rem;
-              min-height: 2.75rem;
-              margin: 0.25rem;
               border-radius: 0.75rem;
               padding: 0.35rem 0.45rem;
               gap: 0.05rem;
@@ -1369,7 +1368,7 @@ function hasTimeOverlap(startTime, endTime, existingStartTime, existingEndTime) 
   );
 }
 
-function getBookingGridColumn(booking, timeSlots) {
+function getBookingEventPosition(booking, timeSlots) {
   const start = getBookingStartTime(booking);
   const end = getBookingEndTime(booking);
 
@@ -1385,16 +1384,22 @@ function getBookingGridColumn(booking, timeSlots) {
     return null;
   }
 
-  const startIndex = Math.max(
-    0,
-    Math.floor((bookingStart - gridStartMinutes) / SLOT_INTERVAL_MINUTES)
-  );
-  const endIndex = Math.min(
-    timeSlots.length,
-    Math.ceil((bookingEnd - gridStartMinutes) / SLOT_INTERVAL_MINUTES)
-  );
+  const clippedStart = Math.max(bookingStart, gridStartMinutes);
+  const clippedEnd = Math.min(bookingEnd, gridEndMinutes);
+  const visibleMinutes = clippedEnd - clippedStart;
+  const gridMinutes = gridEndMinutes - gridStartMinutes;
 
-  return `${startIndex + 1} / ${Math.max(startIndex + 2, endIndex + 1)}`;
+  if (visibleMinutes <= 0 || gridMinutes <= 0) {
+    return null;
+  }
+
+  const left = ((clippedStart - gridStartMinutes) / gridMinutes) * 100;
+  const width = (visibleMinutes / gridMinutes) * 100;
+
+  return {
+    left: Math.max(0, Math.min(100, left)),
+    width: Math.max(0.01, Math.min(100 - left, width)),
+  };
 }
 
 export default RoomScheduleBoard;
