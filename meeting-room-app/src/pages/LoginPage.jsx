@@ -12,6 +12,7 @@ import api from '../services/api';
 
 const GOOGLE_CLIENT_ID = '306782234855-2ijntfp561ktmpv64a80eggqv3k4gr7q.apps.googleusercontent.com';
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
 function useToast() {
   const [toasts, setToasts] = useState([]);
   const show = (message, type = 'success') => {
@@ -36,6 +37,7 @@ function ToastContainer({ toasts }) {
   );
 }
 
+// ── Field component — defined OUTSIDE LoginPage so it never remounts ──────────
 function Field({ icon, label, error, hasError, children }) {
   const showBorder = error || hasError;
   return (
@@ -50,6 +52,7 @@ function Field({ icon, label, error, hasError, children }) {
   );
 }
 
+// ── Desktop Left Panel — defined OUTSIDE ──────────────────────────────────────
 function LeftPanel() {
   return (
     <div style={{ width:'100%', background:'#0f172a', display:'flex', flexDirection:'column', justifyContent:'space-between', padding:'40px 44px', position:'relative', overflow:'hidden' }}>
@@ -62,18 +65,19 @@ function LeftPanel() {
         <span style={{ color:'#fff', fontSize:23, fontWeight:700, letterSpacing:'-0.3px' }}>RoomBook</span>
       </div>
       <div style={{ position:'relative' }}>
+        <p style={{ fontSize:11, fontWeight:600, color:'#3b82f6', textTransform:'uppercase', letterSpacing:'0.1em', margin:'0 0 12px' }}>Plaxonic Technologies</p>
         <h1 style={{ color:'#fff', fontSize:30, fontWeight:700, lineHeight:1.3, margin:'0 0 14px', letterSpacing:'-0.5px' }}>
           Smart meeting rooms,<br/>
           <span style={{ color:'#60a5fa' }}>zero conflicts.</span>
         </h1>
-        <p style={{ color:'#94a3b8', fontSize:17.5, lineHeight:1.75, margin:0 }}>Reserve the right room at the right time. Real-time availability, instant confirmation.</p>
+        <p style={{ color:'#94a3b8', fontSize:14, lineHeight:1.75, margin:0 }}>Reserve the right room at the right time. Real-time availability, instant confirmation.</p>
         <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginTop:24 }}>
-          {['Real-time availability','Conflict detection','Admin controls','Booking calendar'].map((f)=>(
+          {['Real-time availability','Conflict detection','Admin controls','Email reminders','Auto check-in'].map((f)=>(
             <span key={f} style={{ fontSize:11.5, fontWeight:500, color:'#cbd5e1', background:'#ffffff0d', border:'1px solid #ffffff15', borderRadius:20, padding:'5px 12px' }}>{f}</span>
           ))}
         </div>
       </div>
-      <div style={{ position:'relative', display:'flex', gap:36 }}>
+      <div style={{ position:'relative', display:'flex', gap:36, paddingTop:24, borderTop:'1px solid #ffffff10' }}>
         {[['0','Double bookings'],['Live','Availability'],['Instant','Confirmation']].map(([val,label])=>(
           <div key={label}>
             <p style={{ color:'#fff', fontSize:21, fontWeight:700, margin:'0 0 3px' }}>{val}</p>
@@ -85,6 +89,35 @@ function LeftPanel() {
   );
 }
 
+// ── Mobile Brand Header — defined OUTSIDE ─────────────────────────────────────
+function MobileBrandHeader() {
+  return (
+    <div style={{ background:'#0f172a', padding:'36px 28px 44px', position:'relative', overflow:'hidden' }}>
+      <div style={{ position:'absolute', inset:0, backgroundImage:'radial-gradient(circle, #ffffff08 1px, transparent 1px)', backgroundSize:'20px 20px' }}/>
+      <div style={{ position:'absolute', top:-40, right:-40, width:180, height:180, borderRadius:'50%', background:'#2563eb15' }}/>
+      <div style={{ position:'relative', display:'flex', alignItems:'center', gap:9, marginBottom:22 }}>
+        <div style={{ width:32, height:32, background:'#2563eb', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <MdMeetingRoom size={18} color="#fff"/>
+        </div>
+        <span style={{ fontSize:16, fontWeight:700, color:'#fff' }}>RoomBook</span>
+        <span style={{ marginLeft:'auto', fontSize:10, color:'#60a5fa', background:'#1e3a5f', border:'1px solid #2563eb40', borderRadius:20, padding:'3px 8px', fontWeight:500 }}>by Plaxonic</span>
+      </div>
+      <div style={{ position:'relative' }}>
+        <h2 style={{ fontSize:22, fontWeight:700, color:'#fff', margin:'0 0 8px', lineHeight:1.3, letterSpacing:'-0.4px' }}>
+          Smart rooms,<br/><span style={{ color:'#60a5fa' }}>zero conflicts.</span>
+        </h2>
+        <p style={{ fontSize:12, color:'#64748b', margin:'0 0 16px', lineHeight:1.6 }}>Book meeting rooms instantly with real-time availability.</p>
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {['Live availability','Auto check-in','Email reminders'].map(f => (
+            <span key={f} style={{ fontSize:10, color:'#94a3b8', background:'#ffffff0d', border:'1px solid #ffffff15', borderRadius:20, padding:'3px 9px' }}>{f}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Main LoginPage ────────────────────────────────────────────────────────────
 function LoginPage() {
   const navigate = useNavigate();
   const { login, register } = useAuth();
@@ -189,80 +222,92 @@ function LoginPage() {
         localStorage.setItem('refreshToken', refreshToken);
         localStorage.setItem('user', JSON.stringify(user));
         showToast(`Welcome, ${user.name}! 👋`,'success');
-       setTimeout(()=>{
-  window.location.href = user.role==='admin' ? '/admin' : '/rooms';
-}, 1500);
+        setTimeout(()=>{ window.location.href = user.role==='admin' ? '/admin' : '/rooms'; }, 1500);
       } else {
-  showToast(response.data?.message||'Google login failed','error');
-  setGoogleLoading(false);
-}
-} catch(error) {
-  showToast(error.response?.data?.message||'Google login failed','error');
-  setGoogleLoading(false);
-}
+        showToast(response.data?.message||'Google login failed','error');
+        setGoogleLoading(false);
+      }
+    } catch(error) {
+      showToast(error.response?.data?.message||'Google login failed','error');
+      setGoogleLoading(false);
+    }
   };
 
   const handleGoogleError = () => showToast('Google sign in was cancelled or failed','error');
-
   const switchTab = (tab) => { setActiveTab(tab); setLoginErrors({}); setRegErrors({}); setShowPassword(false); };
-
-  const Divider = () => (
-    <div style={{ display:'flex', alignItems:'center', gap:10, margin:'14px 0' }}>
-      <div style={{ flex:1, height:1, background:'#e2e8f0' }}/>
-      <span style={{ fontSize:12, color:'#94a3b8' }}>or continue with</span>
-      <div style={{ flex:1, height:1, background:'#e2e8f0' }}/>
-    </div>
-  );
-
-  const SubmitBtn = ({ text, loadingText }) => (
-    <button type="submit" disabled={loading} style={{ width:'100%', padding:'13px 0', borderRadius:10, background: loading?'#1e293b':'#0f172a', color:'#fff', fontSize:14, fontWeight:600, border:'none', cursor: loading?'not-allowed':'pointer', letterSpacing:'0.01em', marginBottom:4, display:'flex', alignItems:'center', justifyContent:'center', gap:10, opacity: loading?0.9:1 }}>
-      {loading ? (<><div style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTop:'2px solid #fff', borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/>{loadingText}</>) : text}
-    </button>
-  );
 
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
       <div style={{ minHeight:'100vh', display:'flex', fontFamily:"'Inter', sans-serif" }}>
         <ToastContainer toasts={toasts}/>
 
+        {/* Desktop left panel */}
         <div className="login-left-panel" style={{ display:'none', width:'47%' }}>
           <LeftPanel/>
         </div>
 
-        <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'36px 20px', background:'#fff', minHeight:'100vh' }}>
-          <div style={{ width:'100%', maxWidth:380 }}>
+        {/* Right / Mobile */}
+        <div style={{ flex:1, display:'flex', flexDirection:'column', background:'#fff', minHeight:'100vh' }}>
 
-            <div className="login-mobile-logo" style={{ display:'none', alignItems:'center', gap:8, marginBottom:32, justifyContent:'center' }}>
-              <div style={{ width:34, height:34, borderRadius:9, background:'#0f172a', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                <MdMeetingRoom size={18} color="#fff"/>
-              </div>
-              <span style={{ fontSize:17, fontWeight:700, color:'#0f172a' }}>RoomBook</span>
-            </div>
+          <div className="login-mobile-header">
+            <MobileBrandHeader/>
+          </div>
 
-            {activeTab==='login' && (
-              <>
-                <div style={{ marginBottom:28 }}>
-                  <h2 style={{ fontSize:24, fontWeight:700, color:'#0f172a', margin:'0 0 6px', letterSpacing:'-0.3px' }}>Sign in</h2>
-                  <p style={{ fontSize:14, color:'#64748b', margin:0 }}>Welcome back to RoomBook</p>
-                </div>
-                <form onSubmit={handleLoginSubmit}>
-                  <Field icon={<FaEnvelope size={13}/>} label="Email address" error={loginErrors.email} hasError={!!loginErrors.email}>
-                    <input type="email" required placeholder="you@company.com" value={loginData.email} onChange={(e)=>{ setLoginData({...loginData,email:e.target.value}); setLoginErrors(prev=>({...prev,email:''})); }} style={inputStyle}/>
-                  </Field>
-                  <Field icon={<FaLock size={13}/>} label="Password" error={loginErrors.password} hasError={!!loginErrors.password}>
-                    <input type={showPassword?'text':'password'} required placeholder="••••••••" value={loginData.password} onChange={(e)=>{ setLoginData({...loginData,password:e.target.value}); setLoginErrors(prev=>({...prev,password:''})); }} style={inputStyle}/>
-                    <button type="button" onClick={()=>setShowPassword(!showPassword)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', padding:0, display:'flex' }}>
-                      {showPassword?<FaEyeSlash size={14}/>:<FaEye size={14}/>}
-                    </button>
-                  </Field>
-                  <div style={{ textAlign:'right', marginTop:-8, marginBottom:18 }}>
-                    <Link to="/forgot-password" style={{ fontSize:13, color:'#2563eb', fontWeight:500, textDecoration:'none' }}>Forgot password?</Link>
+          <div className="login-form-area" style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:'36px 24px' }}>
+            <div style={{ width:'100%', maxWidth:380 }}>
+
+              {/* ── LOGIN FORM ── */}
+              {activeTab === 'login' && (
+                <>
+                  <div style={{ marginBottom:24 }}>
+                    <h2 style={{ fontSize:22, fontWeight:700, color:'#0f172a', margin:'0 0 4px', letterSpacing:'-0.3px' }}>Sign in</h2>
+                    <p style={{ fontSize:13, color:'#94a3b8', margin:0 }}>Welcome back to RoomBook</p>
                   </div>
-                  <SubmitBtn text="Sign in " loadingText="Signing in..."/>
-                </form>
-                <Divider/>
-                <div style={{ display:'flex', justifyContent:'center' }}>
-                  <GoogleLogin
+
+                  <form onSubmit={handleLoginSubmit}>
+                    <Field icon={<FaEnvelope size={13}/>} label="Email address" error={loginErrors.email} hasError={!!loginErrors.email}>
+                      <input
+                        type="email"
+                        required
+                        placeholder="you@company.com"
+                        value={loginData.email}
+                        onChange={(e) => { setLoginData({...loginData, email: e.target.value}); setLoginErrors(prev=>({...prev,email:''})); }}
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field icon={<FaLock size={13}/>} label="Password" error={loginErrors.password} hasError={!!loginErrors.password}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="••••••••"
+                        value={loginData.password}
+                        onChange={(e) => { setLoginData({...loginData, password: e.target.value}); setLoginErrors(prev=>({...prev,password:''})); }}
+                        style={inputStyle}
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)}
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', padding:0, display:'flex' }}>
+                        {showPassword ? <FaEyeSlash size={14}/> : <FaEye size={14}/>}
+                      </button>
+                    </Field>
+
+                    <div style={{ textAlign:'right', marginTop:-8, marginBottom:18 }}>
+                      <Link to="/forgot-password" style={{ fontSize:13, color:'#2563eb', fontWeight:500, textDecoration:'none' }}>Forgot password?</Link>
+                    </div>
+
+                    <button type="submit" disabled={loading} style={{ width:'100%', padding:'13px 0', borderRadius:12, background: loading?'#1e293b':'#0f172a', color:'#fff', fontSize:14, fontWeight:600, border:'none', cursor: loading?'not-allowed':'pointer', marginBottom:4, display:'flex', alignItems:'center', justifyContent:'center', gap:10, opacity: loading?0.9:1 }}>
+                      {loading ? (<><div style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTop:'2px solid #fff', borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/>Signing in...</>) : 'Sign in'}
+                    </button>
+                  </form>
+
+                  <div style={{ display:'flex', alignItems:'center', gap:10, margin:'14px 0' }}>
+                    <div style={{ flex:1, height:1, background:'#e2e8f0' }}/>
+                    <span style={{ fontSize:12, color:'#94a3b8' }}>or continue with</span>
+                    <div style={{ flex:1, height:1, background:'#e2e8f0' }}/>
+                  </div>
+
+                  <div style={{ display:'flex', justifyContent:'center' }}>
+                    <GoogleLogin
                       onSuccess={handleGoogleSuccess}
                       onError={handleGoogleError}
                       width="380"
@@ -271,65 +316,110 @@ function LoginPage() {
                       theme="outline"
                       size="large"
                     />
-                </div>
-                <p style={{ textAlign:'center', fontSize:13.5, color:'#64748b', marginTop:20 }}>
-                  Don't have an account?{' '}
-                  <span onClick={()=>switchTab('register')} style={{ color:'#2563eb', fontWeight:600, cursor:'pointer' }}>Sign up</span>
-                </p>
-              </>
-            )}
+                  </div>
 
-            {activeTab==='register' && (
-              <>
-                <div style={{ marginBottom:28 }}>
-                  <h2 style={{ fontSize:24, fontWeight:700, color:'#0f172a', margin:'0 0 6px', letterSpacing:'-0.3px' }}>Create account</h2>
-                  <p style={{ fontSize:14, color:'#64748b', margin:0 }}>Join your team on RoomBook</p>
-                </div>
-                <form onSubmit={handleRegisterSubmit}>
-                  <Field icon={<FaUser size={13}/>} label="Full name" error={regErrors.name}>
-                    <input type="text" placeholder="Your full name" required value={regData.name} onChange={(e)=>setRegData({...regData,name:e.target.value})} style={inputStyle}/>
-                  </Field>
-                  <Field icon={<FaEnvelope size={13}/>} label="Email address" error={regErrors.email}>
-                    <input type="email" placeholder="you@company.com" required value={regData.email} onChange={(e)=>setRegData({...regData,email:e.target.value})} style={inputStyle}/>
-                  </Field>
-                  <Field icon={<FaLock size={13}/>} label="Password" error={regErrors.password}>
-                    <input type={showPassword?'text':'password'} required placeholder="Min 8 characters" value={regData.password} onChange={(e)=>setRegData({...regData,password:e.target.value})} style={inputStyle}/>
-                    <button type="button" onClick={()=>setShowPassword(!showPassword)} style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', padding:0, display:'flex' }}>
-                      {showPassword?<FaEyeSlash size={14}/>:<FaEye size={14}/>}
-                    </button>
-                  </Field>
-                  {regData.password.length>0 && (
-                    <div style={{ marginTop:-8, marginBottom:16 }}>
-                      <div style={{ display:'flex', gap:4, marginBottom:5 }}>
-                        {[1,2,3,4].map((level)=>{
-                          const strength=getStrength(regData.password);
-                          return <div key={level} style={{ flex:1, height:3, borderRadius:99, background: level<=strength?strengthColor[strength]:'#e2e8f0', transition:'background 0.2s' }}/>;
-                        })}
+                  <p style={{ textAlign:'center', fontSize:13.5, color:'#64748b', marginTop:20 }}>
+                    Don't have an account?{' '}
+                    <span onClick={() => switchTab('register')} style={{ color:'#2563eb', fontWeight:600, cursor:'pointer' }}>Sign up</span>
+                  </p>
+                </>
+              )}
+
+              {/* ── REGISTER FORM ── */}
+              {activeTab === 'register' && (
+                <>
+                  <div style={{ marginBottom:24 }}>
+                    <h2 style={{ fontSize:22, fontWeight:700, color:'#0f172a', margin:'0 0 4px', letterSpacing:'-0.3px' }}>Create account</h2>
+                    <p style={{ fontSize:13, color:'#94a3b8', margin:0 }}>Join your team on RoomBook</p>
+                  </div>
+
+                  <form onSubmit={handleRegisterSubmit}>
+                    <Field icon={<FaUser size={13}/>} label="Full name" error={regErrors.name}>
+                      <input
+                        type="text"
+                        placeholder="Your full name"
+                        required
+                        value={regData.name}
+                        onChange={(e) => setRegData({...regData, name: e.target.value})}
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field icon={<FaEnvelope size={13}/>} label="Email address" error={regErrors.email}>
+                      <input
+                        type="email"
+                        placeholder="you@company.com"
+                        required
+                        value={regData.email}
+                        onChange={(e) => setRegData({...regData, email: e.target.value})}
+                        style={inputStyle}
+                      />
+                    </Field>
+
+                    <Field icon={<FaLock size={13}/>} label="Password" error={regErrors.password}>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Min 8 characters"
+                        value={regData.password}
+                        onChange={(e) => setRegData({...regData, password: e.target.value})}
+                        style={inputStyle}
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)}
+                        style={{ background:'none', border:'none', cursor:'pointer', color:'#94a3b8', padding:0, display:'flex' }}>
+                        {showPassword ? <FaEyeSlash size={14}/> : <FaEye size={14}/>}
+                      </button>
+                    </Field>
+
+                    {regData.password.length > 0 && (
+                      <div style={{ marginTop:-8, marginBottom:16 }}>
+                        <div style={{ display:'flex', gap:4, marginBottom:5 }}>
+                          {[1,2,3,4].map((level) => {
+                            const strength = getStrength(regData.password);
+                            return <div key={level} style={{ flex:1, height:3, borderRadius:99, background: level<=strength ? strengthColor[strength] : '#e2e8f0', transition:'background 0.2s' }}/>;
+                          })}
+                        </div>
+                        <p style={{ fontSize:11.5, color:strengthColor[getStrength(regData.password)], margin:0, fontWeight:500 }}>{strengthLabel[getStrength(regData.password)]}</p>
                       </div>
-                      <p style={{ fontSize:11.5, color:strengthColor[getStrength(regData.password)], margin:0, fontWeight:500 }}>{strengthLabel[getStrength(regData.password)]}</p>
-                    </div>
-                  )}
-                  <SubmitBtn text="Create account →" loadingText="Creating account..."/>
-                </form>
-                {/* <Divider/>
-                <div style={{ display:'flex', justifyContent:'center' }}>
-                  <GoogleLog  in onSuccess={handleGoogleSuccess} onError={handleGoogleError} width="380" text="signup_with" shape="rectangular" theme="outline" size="large"/>
-                </div> */}
-                <p style={{ textAlign:'center', fontSize:13.5, color:'#64748b', marginTop:20 }}>
-                  Already have an account?{' '}
-                  <span onClick={()=>switchTab('login')} style={{ color:'#2563eb', fontWeight:600, cursor:'pointer' }}>Sign in</span>
-                </p>
-              </>
-            )}
+                    )}
 
-            <p style={{ textAlign:'center', fontSize:11.5, color:'#cbd5e1', marginTop:28 }}>© 2026 Plaxonic Technologies · All rights reserved</p>
+                    <button type="submit" disabled={loading} style={{ width:'100%', padding:'13px 0', borderRadius:12, background: loading?'#1e293b':'#0f172a', color:'#fff', fontSize:14, fontWeight:600, border:'none', cursor: loading?'not-allowed':'pointer', marginBottom:4, display:'flex', alignItems:'center', justifyContent:'center', gap:10, opacity: loading?0.9:1 }}>
+                      {loading ? (<><div style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTop:'2px solid #fff', borderRadius:'50%', animation:'spin 0.7s linear infinite' }}/>Creating account...</>) : 'Create account →'}
+                    </button>
+                  </form>
+
+                  <p style={{ textAlign:'center', fontSize:13.5, color:'#64748b', marginTop:20 }}>
+                    Already have an account?{' '}
+                    <span onClick={() => switchTab('login')} style={{ color:'#2563eb', fontWeight:600, cursor:'pointer' }}>Sign in</span>
+                  </p>
+                </>
+              )}
+
+              <p style={{ textAlign:'center', fontSize:11.5, color:'#cbd5e1', marginTop:28 }}>© 2026 Plaxonic Technologies · All rights reserved</p>
+            </div>
           </div>
         </div>
 
         <style>{`
           @keyframes spin { to { transform: rotate(360deg); } }
-          @media (min-width: 768px) { .login-left-panel { display: flex !important; } .login-mobile-logo { display: none !important; } }
-          @media (max-width: 767px) { .login-left-panel { display: none !important; } .login-mobile-logo { display: flex !important; } }
+          @media (min-width: 768px) {
+            .login-left-panel { display: flex !important; }
+            .login-mobile-header { display: none !important; }
+            .login-form-area { background: #fff; border-radius: 0; margin-top: 0; }
+          }
+          @media (max-width: 767px) {
+            .login-left-panel { display: none !important; }
+            .login-mobile-header { display: block !important; }
+            .login-form-area {
+              background: #fff;
+              border-radius: 24px 24px 0 0;
+              margin-top: -20px;
+              position: relative;
+              z-index: 1;
+              padding: 28px 24px !important;
+              box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+            }
+          }
         `}</style>
       </div>
     </GoogleOAuthProvider>

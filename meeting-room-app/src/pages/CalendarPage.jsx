@@ -137,13 +137,13 @@ function CalendarPage() {
         {/* Calendar */}
         <div className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm">
           <FullCalendar
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: 'dayGridMonth,timeGridWeek,timeGridDay',
-            }}
+  plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+  initialView="dayGridMonth"
+  headerToolbar={{
+    left: 'prev,next',
+    center: 'title',
+    right: 'today',
+  }}
             events={events}
             eventClick={handleEventClick}
             dateClick={handleDateClick}
